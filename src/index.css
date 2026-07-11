@@ -1,0 +1,53 @@
+:root {
+  --text: #c9c6d0;
+  --text-h: #ffffff;
+  --bg: #000000;
+  --panel: #17171c;
+  --border: #2c2b34;
+  --accent: #34b872;
+  --accent-hover: #2c9c61;
+  --danger: #e0554a;
+  --table-felt: #0a3626;
+
+  /* 4-color deck: suits are told apart by color as well as shape.
+     "-bright" variants keep suits legible on the dark background. */
+  --suit-black: #1c1c22;
+  --suit-red: #d62839;
+  --suit-blue: #1565d8;
+  --suit-green: #1d8a3e;
+  --suit-black-bright: #e8e6ee;
+  --suit-red-bright: #ff6b78;
+  --suit-blue-bright: #62a5ff;
+  --suit-green-bright: #4ecb77;
+
+  font: 16px/1.55 system-ui, 'Segoe UI', Roboto, sans-serif;
+  color-scheme: dark;
+  color: var(--text);
+  background: var(--bg);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+h1, h2, h3 {
+  color: var(--text-h);
+  margin: 0 0 0.5em;
+}
+
+button {
+  font: inherit;
+  cursor: pointer;
+}
+
+input, select, textarea {
+  font: inherit;
+}

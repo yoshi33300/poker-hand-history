@@ -1,0 +1,14 @@
+# Render.com deployment blueprint.
+# Render dashboard > New > Blueprint でこのリポジトリを選ぶと自動で設定されます。
+services:
+  - type: web
+    name: poker-hand-history
+    runtime: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false # ダッシュボードで手入力 (リポジトリには含めない)
+      - key: DAILY_LIMIT
+        value: "10"
