@@ -1,7 +1,8 @@
-import { useRef } from 'react'
+import { useEffect, useState } from 'react'
 import { resizePlayers } from '../players'
 import { formatBB } from '../bb'
 import type { Player } from '../types'
+import WheelPicker from './WheelPicker'
 
 interface PositionsEditorProps {
   players: Player[]
@@ -10,7 +11,23 @@ interface PositionsEditorProps {
   bb: number
 }
 
+/** Matches the mobile CSS breakpoint; drives the drum-roll picker UX. */
+function useIsNarrow() {
+  const [narrow, setNarrow] = useState(() => window.matchMedia('(max-width: 620px)').matches)
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 620px)')
+    const listener = (e: MediaQueryListEvent) => setNarrow(e.matches)
+    mq.addEventListener('change', listener)
+    return () => mq.removeEventListener('change', listener)
+  }, [])
+  return narrow
+}
+
 export default function PositionsEditor({ players, onChange, defaultStack, bb }: PositionsEditorProps) {
+  const isNarrow = useIsNarrow()
+  // Which stack the drum-roll picker is editing: every seat at once, or one player.
+  const [picker, setPicker] = useState<{ kind: 'all' } | { kind: 'one'; id: string } | null>(null)
+
   function updateStack(id: string, startingStack: number) {
     onChange(players.map((p) => (p.id === id ? { ...p, startingStack } : p)))
   }
@@ -34,24 +51,14 @@ export default function PositionsEditor({ players, onChange, defaultStack, bb }:
     onSet(Math.max(0, current + (e.deltaY < 0 ? step : -step)))
   }
 
-  // Touch: drag up/down on a stack input to adjust it (10 chips per 24px).
-  // The inputs set `touch-action: none` so the page doesn't scroll instead.
-  const touchDrag = useRef<{ startY: number; base: number } | null>(null)
+  // The "all stacks" field shows the shared value, or blank when stacks differ.
+  const commonStack = players.every((p) => p.startingStack === players[0]?.startingStack)
+    ? players[0]?.startingStack ?? defaultStack
+    : null
 
-  function handleTouchStart(e: React.TouchEvent<HTMLInputElement>, current: number) {
-    touchDrag.current = { startY: e.touches[0].clientY, base: current }
-  }
-
-  function handleTouchMove(e: React.TouchEvent<HTMLInputElement>, onSet: (next: number) => void) {
-    const drag = touchDrag.current
-    if (!drag) return
-    const steps = Math.round((drag.startY - e.touches[0].clientY) / 24)
-    onSet(Math.max(0, drag.base + steps * 10))
-  }
-
-  function handleTouchEnd() {
-    touchDrag.current = null
-  }
+  const pickerMax = Math.max(2000, bb * 500)
+  const pickerTarget =
+    picker?.kind === 'one' ? players.find((p) => p.id === picker.id) : null
 
   return (
     <div className="positions-editor">
@@ -73,23 +80,15 @@ export default function PositionsEditor({ players, onChange, defaultStack, bb }:
             type="number"
             min={0}
             step={10}
-            defaultValue={defaultStack}
-            key={defaultStack}
+            value={commonStack ?? ''}
+            readOnly={isNarrow}
+            onClick={() => {
+              if (isNarrow) setPicker({ kind: 'all' })
+            }}
             onChange={(e) => setAllStacks(Number(e.target.value))}
-            onWheel={(e) => {
-              handleStackWheel(e, Number(e.currentTarget.value) || 0, (next) => {
-                e.currentTarget.value = String(next)
-                setAllStacks(next)
-              })
-            }}
-            onTouchStart={(e) => handleTouchStart(e, Number(e.currentTarget.value) || 0)}
-            onTouchMove={(e) => {
-              handleTouchMove(e, (next) => {
-                e.currentTarget.value = String(next)
-                setAllStacks(next)
-              })
-            }}
-            onTouchEnd={handleTouchEnd}
+            onWheel={(e) =>
+              handleStackWheel(e, commonStack ?? defaultStack, (next) => setAllStacks(next))
+            }
           />
         </label>
       </div>
@@ -112,17 +111,43 @@ export default function PositionsEditor({ players, onChange, defaultStack, bb }:
               min={0}
               step={10}
               value={p.startingStack}
+              readOnly={isNarrow}
+              onClick={() => {
+                if (isNarrow) setPicker({ kind: 'one', id: p.id })
+              }}
               onChange={(e) => updateStack(p.id, Number(e.target.value))}
               onWheel={(e) => handleStackWheel(e, p.startingStack, (next) => updateStack(p.id, next))}
-              onTouchStart={(e) => handleTouchStart(e, p.startingStack)}
-              onTouchMove={(e) => handleTouchMove(e, (next) => updateStack(p.id, next))}
-              onTouchEnd={handleTouchEnd}
               aria-label={`${p.position}のスタック`}
             />
             <span className="position-stack-bb">{formatBB(p.startingStack, bb)}</span>
           </label>
         ))}
       </div>
+
+      {picker?.kind === 'all' && (
+        <WheelPicker
+          title="全員のスタック"
+          value={commonStack ?? defaultStack}
+          min={0}
+          max={pickerMax}
+          step={10}
+          formatSub={(v) => formatBB(v, bb)}
+          onSelect={setAllStacks}
+          onClose={() => setPicker(null)}
+        />
+      )}
+      {pickerTarget && (
+        <WheelPicker
+          title={`${pickerTarget.position}のスタック`}
+          value={pickerTarget.startingStack}
+          min={0}
+          max={pickerMax}
+          step={10}
+          formatSub={(v) => formatBB(v, bb)}
+          onSelect={(v) => updateStack(pickerTarget.id, v)}
+          onClose={() => setPicker(null)}
+        />
+      )}
     </div>
   )
 }

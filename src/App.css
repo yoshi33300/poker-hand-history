@@ -188,12 +188,121 @@ button.primary:hover {
   background: var(--bg);
   color: var(--text-h);
   text-align: right;
-  /* Vertical drags adjust the value instead of scrolling the page. */
-  touch-action: none;
 }
 
-.stack-input {
-  touch-action: none;
+/* ---- Drum-roll picker (bottom sheet) ---- */
+
+.wheel-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  z-index: 100;
+  display: flex;
+  align-items: flex-end;
+}
+
+.wheel-sheet {
+  width: 100%;
+  background: var(--panel);
+  border-radius: 16px 16px 0 0;
+  border-top: 1px solid var(--border);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.wheel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.wheel-title {
+  font-weight: 700;
+  color: var(--text-h);
+}
+
+.wheel-done {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-weight: 700;
+  font-size: 1rem;
+  padding: 0.2rem 0.4rem;
+  cursor: pointer;
+}
+
+.wheel-body {
+  position: relative;
+}
+
+.wheel-body::before,
+.wheel-body::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 70px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.wheel-body::before {
+  top: 0;
+  background: linear-gradient(var(--panel), transparent);
+}
+
+.wheel-body::after {
+  bottom: 0;
+  background: linear-gradient(transparent, var(--panel));
+}
+
+.wheel-highlight {
+  position: absolute;
+  top: 50%;
+  left: 0.75rem;
+  right: 0.75rem;
+  height: 40px;
+  transform: translateY(-50%);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  pointer-events: none;
+}
+
+.wheel-list {
+  height: 200px;
+  overflow-y: auto;
+  scroll-snap-type: y mandatory;
+  padding: 80px 0;
+  touch-action: pan-y;
+  scrollbar-width: none;
+}
+
+.wheel-list::-webkit-scrollbar {
+  display: none;
+}
+
+.wheel-item {
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  scroll-snap-align: center;
+  font-size: 1.15rem;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.wheel-item.selected {
+  color: var(--text-h);
+  font-weight: 700;
+}
+
+.wheel-sub {
+  font-size: 0.75rem;
+  opacity: 0.7;
 }
 
 .position-stack-bb {
