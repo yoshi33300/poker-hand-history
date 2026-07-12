@@ -6,7 +6,6 @@ import { nextToAct } from '../players'
 import { currentBetTo, streetContribution } from '../pot'
 import { formatBB } from '../bb'
 import CardPicker from './CardPicker'
-import PlayingCard from './PlayingCard'
 
 const AMOUNT_TYPES: ActionType[] = ['call', 'bet', 'raise', 'allin']
 
@@ -179,13 +178,6 @@ export default function StreetEditor({
         </div>
       )}
 
-      {data.board.length > 0 && (
-        <div className="board-preview">
-          {data.board.map((c, i) => (
-            <PlayingCard key={i} code={c} size="sm" />
-          ))}
-        </div>
-      )}
     </div>
   )
 }

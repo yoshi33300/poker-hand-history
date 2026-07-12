@@ -60,8 +60,10 @@ export default function PokerTable({ hand, state, actingPlayerId, visibleIds, fo
         y: 50 + 42 * sin,
         // Bet pills sit between the seat and the pot; their radius is a CSS
         // variable so mobile can push them outward to avoid the board.
+        // Near-horizontal rows would land on the board/pot line, so those
+        // pills are pushed into the clear band above/below the center column.
         betCos: cos,
-        betSin: sin,
+        betSin: Math.abs(sin) >= 0.5 ? sin : sin >= 0 ? 0.5 : -0.5,
         buttonX: 50 + 31 * Math.cos(theta - 0.45),
         buttonY: 50 + 29 * Math.sin(theta - 0.45),
       }
@@ -73,7 +75,7 @@ export default function PokerTable({ hand, state, actingPlayerId, visibleIds, fo
     seats.find((s) => s.player.position === 'SB')
 
   return (
-    <div className="poker-table">
+    <div className={`poker-table seats-${hand.players.length}`}>
       <div className="table-felt" />
 
       <div className="table-center">

@@ -1241,6 +1241,59 @@ button.primary:hover {
     flex-shrink: 0;
   }
 
+  /* 7+ seats: shrink each seat further so the ring fits without overlap. */
+  .poker-table.seats-7,
+  .poker-table.seats-8,
+  .poker-table.seats-9 {
+    aspect-ratio: 4 / 4.5;
+  }
+
+  .poker-table.seats-7 .seat-box,
+  .poker-table.seats-8 .seat-box,
+  .poker-table.seats-9 .seat-box {
+    width: 4rem;
+    padding: 0.16rem 0.18rem 0.2rem;
+    border-radius: 7px;
+  }
+
+  .poker-table.seats-7 .seat-cards .playing-card.size-sm,
+  .poker-table.seats-7 .card-back,
+  .poker-table.seats-8 .seat-cards .playing-card.size-sm,
+  .poker-table.seats-8 .card-back,
+  .poker-table.seats-9 .seat-cards .playing-card.size-sm,
+  .poker-table.seats-9 .card-back {
+    width: 1.35rem;
+    height: 1.85rem;
+    font-size: 0.58rem;
+    border-radius: 3px;
+  }
+
+  .poker-table.seats-7 .seat-name,
+  .poker-table.seats-8 .seat-name,
+  .poker-table.seats-9 .seat-name {
+    font-size: 0.62rem;
+  }
+
+  .poker-table.seats-7 .seat-stack,
+  .poker-table.seats-8 .seat-stack,
+  .poker-table.seats-9 .seat-stack {
+    font-size: 0.58rem;
+  }
+
+  .poker-table.seats-7 .seat-action-badge,
+  .poker-table.seats-8 .seat-action-badge,
+  .poker-table.seats-9 .seat-action-badge {
+    font-size: 0.48rem;
+    padding: 0.03rem 0.32rem;
+  }
+
+  .poker-table.seats-7 .hero-badge,
+  .poker-table.seats-8 .hero-badge,
+  .poker-table.seats-9 .hero-badge {
+    font-size: 0.48rem;
+    padding: 0.03rem 0.25rem;
+  }
+
   .position-row {
     gap: 0.4rem;
     padding: 0.4rem 0.5rem;
