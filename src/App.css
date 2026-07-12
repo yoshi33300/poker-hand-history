@@ -188,6 +188,12 @@ button.primary:hover {
   background: var(--bg);
   color: var(--text-h);
   text-align: right;
+  /* Vertical drags adjust the value instead of scrolling the page. */
+  touch-action: none;
+}
+
+.stack-input {
+  touch-action: none;
 }
 
 .position-stack-bb {

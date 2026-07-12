@@ -1,3 +1,4 @@
+import { useRef } from 'react'
 import { resizePlayers } from '../players'
 import { formatBB } from '../bb'
 import type { Player } from '../types'
@@ -33,6 +34,25 @@ export default function PositionsEditor({ players, onChange, defaultStack, bb }:
     onSet(Math.max(0, current + (e.deltaY < 0 ? step : -step)))
   }
 
+  // Touch: drag up/down on a stack input to adjust it (10 chips per 24px).
+  // The inputs set `touch-action: none` so the page doesn't scroll instead.
+  const touchDrag = useRef<{ startY: number; base: number } | null>(null)
+
+  function handleTouchStart(e: React.TouchEvent<HTMLInputElement>, current: number) {
+    touchDrag.current = { startY: e.touches[0].clientY, base: current }
+  }
+
+  function handleTouchMove(e: React.TouchEvent<HTMLInputElement>, onSet: (next: number) => void) {
+    const drag = touchDrag.current
+    if (!drag) return
+    const steps = Math.round((drag.startY - e.touches[0].clientY) / 24)
+    onSet(Math.max(0, drag.base + steps * 10))
+  }
+
+  function handleTouchEnd() {
+    touchDrag.current = null
+  }
+
   return (
     <div className="positions-editor">
       <div className="field-row">
@@ -49,6 +69,7 @@ export default function PositionsEditor({ players, onChange, defaultStack, bb }:
         <label>
           全員のスタック
           <input
+            className="stack-input"
             type="number"
             min={0}
             step={10}
@@ -61,6 +82,14 @@ export default function PositionsEditor({ players, onChange, defaultStack, bb }:
                 setAllStacks(next)
               })
             }}
+            onTouchStart={(e) => handleTouchStart(e, Number(e.currentTarget.value) || 0)}
+            onTouchMove={(e) => {
+              handleTouchMove(e, (next) => {
+                e.currentTarget.value = String(next)
+                setAllStacks(next)
+              })
+            }}
+            onTouchEnd={handleTouchEnd}
           />
         </label>
       </div>
@@ -85,6 +114,9 @@ export default function PositionsEditor({ players, onChange, defaultStack, bb }:
               value={p.startingStack}
               onChange={(e) => updateStack(p.id, Number(e.target.value))}
               onWheel={(e) => handleStackWheel(e, p.startingStack, (next) => updateStack(p.id, next))}
+              onTouchStart={(e) => handleTouchStart(e, p.startingStack)}
+              onTouchMove={(e) => handleTouchMove(e, (next) => updateStack(p.id, next))}
+              onTouchEnd={handleTouchEnd}
               aria-label={`${p.position}のスタック`}
             />
             <span className="position-stack-bb">{formatBB(p.startingStack, bb)}</span>
