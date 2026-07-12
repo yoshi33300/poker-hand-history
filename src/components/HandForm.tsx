@@ -4,12 +4,20 @@ import { createDefaultPlayers, orderForStreet } from '../players'
 import { saveHand } from '../db'
 import { potBeforeStreet, preflopPotType, stackBeforeStreet } from '../pot'
 import { STREETS } from '../types'
+import { useIsNarrow } from '../useIsNarrow'
 import type { CardCode, Hand, Player, Street, StreetData } from '../types'
 import CardPicker from './CardPicker'
 import PositionsEditor from './PositionsEditor'
 import StreetEditor from './StreetEditor'
+import WheelPicker from './WheelPicker'
 
 const emptyStreetData = (): StreetData => ({ board: [], actions: [] })
+
+// Common blind/ante sizes for the drum-roll picker.
+const BLIND_CHOICES = [
+  0, 1, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20, 25, 30, 40, 50, 60, 80, 100, 150, 200,
+  250, 300, 400, 500, 600, 800, 1000, 1500, 2000, 3000, 5000, 10000,
+]
 
 interface HandFormProps {
   onSaved: (hand: Hand) => void
@@ -32,6 +40,9 @@ export default function HandForm({ onSaved }: HandFormProps) {
   })
   const [netAmount, setNetAmount] = useState(0)
   const [notes, setNotes] = useState('')
+  const isNarrow = useIsNarrow()
+  // Which blind field the drum-roll picker is editing on mobile.
+  const [blindPicker, setBlindPicker] = useState<null | 'sb' | 'bb' | 'ante'>(null)
 
   // BB changes always re-baseline every player's stack to 100bb.
   const prevBbRef = useRef(bb)
@@ -161,15 +172,42 @@ export default function HandForm({ onSaved }: HandFormProps) {
           </label>
           <label>
             SB
-            <input type="number" min={0} value={sb} onChange={(e) => setSb(Number(e.target.value))} />
+            <input
+              type="number"
+              min={0}
+              value={sb}
+              readOnly={isNarrow}
+              onClick={() => {
+                if (isNarrow) setBlindPicker('sb')
+              }}
+              onChange={(e) => setSb(Number(e.target.value))}
+            />
           </label>
           <label>
             BB
-            <input type="number" min={0} value={bb} onChange={(e) => setBb(Number(e.target.value))} />
+            <input
+              type="number"
+              min={0}
+              value={bb}
+              readOnly={isNarrow}
+              onClick={() => {
+                if (isNarrow) setBlindPicker('bb')
+              }}
+              onChange={(e) => setBb(Number(e.target.value))}
+            />
           </label>
           <label>
             アンティ
-            <input type="number" min={0} value={ante} onChange={(e) => setAnte(Number(e.target.value))} />
+            <input
+              type="number"
+              min={0}
+              value={ante}
+              readOnly={isNarrow}
+              onClick={() => {
+                if (isNarrow) setBlindPicker('ante')
+              }}
+              onChange={(e) => setAnte(Number(e.target.value))}
+            />
           </label>
         </div>
       </section>
@@ -217,6 +255,20 @@ export default function HandForm({ onSaved }: HandFormProps) {
           保存する
         </button>
       </div>
+
+      {blindPicker && (
+        <WheelPicker
+          title={blindPicker === 'sb' ? 'SB' : blindPicker === 'bb' ? 'BB' : 'アンティ'}
+          value={blindPicker === 'sb' ? sb : blindPicker === 'bb' ? bb : ante}
+          values={BLIND_CHOICES}
+          onSelect={(v) => {
+            if (blindPicker === 'sb') setSb(v)
+            else if (blindPicker === 'bb') setBb(v)
+            else setAnte(v)
+          }}
+          onClose={() => setBlindPicker(null)}
+        />
+      )}
     </div>
   )
 }

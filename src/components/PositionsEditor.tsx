@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { resizePlayers } from '../players'
 import { formatBB } from '../bb'
+import { useIsNarrow } from '../useIsNarrow'
 import type { Player } from '../types'
 import WheelPicker from './WheelPicker'
 
@@ -9,18 +10,6 @@ interface PositionsEditorProps {
   onChange: (players: Player[]) => void
   defaultStack: number
   bb: number
-}
-
-/** Matches the mobile CSS breakpoint; drives the drum-roll picker UX. */
-function useIsNarrow() {
-  const [narrow, setNarrow] = useState(() => window.matchMedia('(max-width: 620px)').matches)
-  useEffect(() => {
-    const mq = window.matchMedia('(max-width: 620px)')
-    const listener = (e: MediaQueryListEvent) => setNarrow(e.matches)
-    mq.addEventListener('change', listener)
-    return () => mq.removeEventListener('change', listener)
-  }, [])
-  return narrow
 }
 
 export default function PositionsEditor({ players, onChange, defaultStack, bb }: PositionsEditorProps) {

@@ -1,11 +1,13 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 interface WheelPickerProps {
   title: string
   value: number
-  min: number
-  max: number
-  step: number
+  /** Explicit sorted list of choices. Takes precedence over min/max/step. */
+  values?: number[]
+  min?: number
+  max?: number
+  step?: number
   /** Small secondary label per item, e.g. the BB equivalent. */
   formatSub?: (v: number) => string
   onSelect: (v: number) => void
@@ -18,32 +20,43 @@ const ITEM_H = 40
 export default function WheelPicker({
   title,
   value,
-  min,
-  max,
-  step,
+  values,
+  min = 0,
+  max = 1000,
+  step = 1,
   formatSub,
   onSelect,
   onClose,
 }: WheelPickerProps) {
   const listRef = useRef<HTMLDivElement>(null)
 
-  const values: number[] = []
-  for (let v = min; v <= max; v += step) values.push(v)
+  // Choices are fixed when the sheet opens; the current value is inserted if
+  // missing so the wheel can start centered on it.
+  const [choices] = useState(() => {
+    const base: number[] = values ? [...values] : []
+    if (!values) {
+      for (let v = min; v <= max; v += step) base.push(v)
+    }
+    if (!base.includes(value)) {
+      base.push(value)
+      base.sort((a, b) => a - b)
+    }
+    return base
+  })
 
   // Center the current value once when the sheet opens.
   useEffect(() => {
     const el = listRef.current
     if (!el) return
-    const index = Math.min(values.length - 1, Math.max(0, Math.round((value - min) / step)))
-    el.scrollTop = index * ITEM_H
+    el.scrollTop = Math.max(0, choices.indexOf(value)) * ITEM_H
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   function handleScroll() {
     const el = listRef.current
     if (!el) return
-    const i = Math.min(values.length - 1, Math.max(0, Math.round(el.scrollTop / ITEM_H)))
-    if (values[i] !== value) onSelect(values[i])
+    const i = Math.min(choices.length - 1, Math.max(0, Math.round(el.scrollTop / ITEM_H)))
+    if (choices[i] !== value) onSelect(choices[i])
   }
 
   return (
@@ -58,7 +71,7 @@ export default function WheelPicker({
         <div className="wheel-body">
           <div className="wheel-highlight" />
           <div className="wheel-list" ref={listRef} onScroll={handleScroll}>
-            {values.map((v) => (
+            {choices.map((v) => (
               <div key={v} className={`wheel-item ${v === value ? 'selected' : ''}`}>
                 {v}
                 {formatSub && <span className="wheel-sub">{formatSub(v)}</span>}
