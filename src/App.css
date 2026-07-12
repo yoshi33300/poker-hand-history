@@ -79,6 +79,8 @@
   border-radius: 6px;
   background: var(--bg);
   color: var(--text-h);
+  /* Keep at/above 16px so iOS Safari doesn't auto-zoom the page on focus. */
+  font-size: 1rem;
 }
 
 .field-row input[type='number'] {
@@ -188,6 +190,8 @@ button.primary:hover {
   background: var(--bg);
   color: var(--text-h);
   text-align: right;
+  /* Keep at/above 16px so iOS Safari doesn't auto-zoom the page on focus. */
+  font-size: 1rem;
 }
 
 /* ---- Drum-roll picker (bottom sheet) ---- */
