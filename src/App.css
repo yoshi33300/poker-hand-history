@@ -82,7 +82,7 @@
 }
 
 .field-row input[type='number'] {
-  width: 6.5rem;
+  width: 4rem;
 }
 
 .notes-label {
@@ -1156,6 +1156,32 @@ button.primary:hover {
 
   .table-pot {
     font-size: 0.78rem;
+  }
+
+  .position-row {
+    gap: 0.4rem;
+    padding: 0.4rem 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .position-name {
+    min-width: 2.4rem;
+    font-size: 0.9rem;
+  }
+
+  .hero-badge {
+    font-size: 0.62rem;
+    padding: 0.08rem 0.35rem;
+  }
+
+  .position-stack {
+    width: 5.2rem;
+    padding: 0.3rem 0.4rem;
+  }
+
+  .position-stack-bb {
+    width: auto;
+    font-size: 0.7rem;
   }
 }
 

@@ -81,15 +81,15 @@ export interface Hand {
 export const STREETS: Street[] = ['preflop', 'flop', 'turn', 'river']
 
 export const ACTION_LABELS: Record<ActionType, string> = {
-  'post-sb': 'SBポスト',
-  'post-bb': 'BBポスト',
-  'post-ante': 'アンティ',
-  fold: 'フォールド',
-  check: 'チェック',
-  call: 'コール',
-  bet: 'ベット',
-  raise: 'レイズ',
-  allin: 'オールイン',
+  'post-sb': 'Post SB',
+  'post-bb': 'Post BB',
+  'post-ante': 'Ante',
+  fold: 'Fold',
+  check: 'Check',
+  call: 'Call',
+  bet: 'Bet',
+  raise: 'Raise',
+  allin: 'All-in',
 }
 
 export const STREET_LABELS: Record<Street, string> = {

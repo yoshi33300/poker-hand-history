@@ -26,6 +26,13 @@ export default function PositionsEditor({ players, onChange, defaultStack, bb }:
     onChange(players.map((p) => ({ ...p, startingStack: stack })))
   }
 
+  // Scroll up/down over a stack input to nudge it by one step, like a spinner.
+  function handleStackWheel(e: React.WheelEvent<HTMLInputElement>, current: number, onSet: (next: number) => void) {
+    e.preventDefault()
+    const step = 10
+    onSet(Math.max(0, current + (e.deltaY < 0 ? step : -step)))
+  }
+
   return (
     <div className="positions-editor">
       <div className="field-row">
@@ -48,6 +55,12 @@ export default function PositionsEditor({ players, onChange, defaultStack, bb }:
             defaultValue={defaultStack}
             key={defaultStack}
             onChange={(e) => setAllStacks(Number(e.target.value))}
+            onWheel={(e) => {
+              handleStackWheel(e, Number(e.currentTarget.value) || 0, (next) => {
+                e.currentTarget.value = String(next)
+                setAllStacks(next)
+              })
+            }}
           />
         </label>
       </div>
@@ -71,6 +84,7 @@ export default function PositionsEditor({ players, onChange, defaultStack, bb }:
               step={10}
               value={p.startingStack}
               onChange={(e) => updateStack(p.id, Number(e.target.value))}
+              onWheel={(e) => handleStackWheel(e, p.startingStack, (next) => updateStack(p.id, next))}
               aria-label={`${p.position}のスタック`}
             />
             <span className="position-stack-bb">{formatBB(p.startingStack, bb)}</span>
