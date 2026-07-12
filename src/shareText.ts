@@ -1,7 +1,8 @@
 import { STREETS, STREET_LABELS } from './types'
 import type { ActionType, Hand, HandAction } from './types'
 import { formatCard } from './cards'
-import { potBeforeStreet } from './pot'
+import { effectiveStack, potBeforeStreet } from './pot'
+import { formatBB } from './bb'
 
 // Poker shorthand: r = raise, b = bet, c = call, x = check, f = fold, ai = all-in.
 const ACTION_SHORT: Record<ActionType, string> = {
@@ -37,10 +38,12 @@ export function buildHandText(hand: Hand): string {
 
   const lines: string[] = []
   lines.push(`HERO　${heroPos}　${holeCards}`.trim())
+  const eff = effectiveStack(hand)
+  const effText = Number.isFinite(eff) ? ` eff ${formatBB(eff, hand.stakes.bb)}` : ''
   lines.push(
     `${hand.stakes.currency}${hand.stakes.sb}/${hand.stakes.currency}${hand.stakes.bb}${
       hand.stakes.ante > 0 ? ` (アンティ${hand.stakes.ante})` : ''
-    }　${hand.gameType}`,
+    }　${hand.gameType}${effText}`,
   )
   lines.push('')
 

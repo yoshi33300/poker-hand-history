@@ -86,6 +86,23 @@ export function preflopPotType(hand: Pick<Hand, 'players' | 'stakes' | 'streets'
   return `${raises + 1}BP`
 }
 
+/**
+ * Effective stack: the smallest starting stack among players still in the
+ * hand at the end (i.e. never folded) — the most either side could actually
+ * win or lose. Falls back to hero's stack alone if everyone else folded.
+ */
+export function effectiveStack(hand: Pick<Hand, 'players' | 'streets'>): number {
+  const folded = new Set<string>()
+  for (const street of STREETS) {
+    for (const a of hand.streets[street].actions) {
+      if (a.type === 'fold') folded.add(a.playerId)
+    }
+  }
+  const remaining = hand.players.filter((p) => !folded.has(p.id))
+  const pool = remaining.length > 0 ? remaining : hand.players
+  return pool.reduce((min, p) => Math.min(min, p.startingStack), Infinity)
+}
+
 /** A player's remaining stack at the start of `street` (before this street's own actions). */
 export function stackBeforeStreet(
   hand: Pick<Hand, 'players' | 'stakes' | 'streets'>,
