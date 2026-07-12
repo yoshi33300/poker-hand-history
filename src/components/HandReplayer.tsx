@@ -94,7 +94,7 @@ export default function HandReplayer({ hand, onBack }: HandReplayerProps) {
   const events = useMemo(() => buildTimeline(hand), [hand])
   const [step, setStep] = useState(0)
   const [playing, setPlaying] = useState(false)
-  const [unit, setUnit] = useState<'chips' | 'bb'>('chips')
+  const [unit, setUnit] = useState<'chips' | 'bb'>('bb')
   const [copied, setCopied] = useState(false)
   const [manualText, setManualText] = useState<string | null>(null)
   const formatAmount = (chips: number) =>
@@ -151,7 +151,6 @@ export default function HandReplayer({ hand, onBack }: HandReplayerProps) {
   const state = computeState(hand, events, step)
   const currentEvent = step > 0 ? events[step - 1] : null
   const actingPlayerId = currentEvent?.kind === 'action' ? currentEvent.action.playerId : null
-  const hero = hand.players.find((p) => p.isHero)
 
   const preflopActed = useMemo(
     () => new Set(hand.streets.preflop.actions.map((a) => a.playerId)),
@@ -167,12 +166,6 @@ export default function HandReplayer({ hand, onBack }: HandReplayerProps) {
   function positionOf(id: string) {
     return hand.players.find((p) => p.id === id)?.position ?? '?'
   }
-
-  const blindSummary = hand.players
-    .map((p) => ({ p, base: blindBaseline(p, hand.stakes) }))
-    .filter(({ base }) => base > 0)
-    .map(({ p, base }) => `${p.position} ${formatAmount(base)}`)
-    .join(' ・ ')
 
   function describe(e: TimelineEvent): string {
     if (e.kind === 'street-start') return `— ${STREET_LABELS[e.street]} —`
@@ -237,7 +230,6 @@ export default function HandReplayer({ hand, onBack }: HandReplayerProps) {
       <div className="replay-current-event">
         {currentEvent ? describe(currentEvent) : 'ハンド開始前'}
       </div>
-      {blindSummary && <p className="replay-blind-note">最初から投入済み: {blindSummary}</p>}
 
       <div className="replay-controls">
         <button type="button" onClick={() => setStep(0)} disabled={step === 0}>
@@ -289,11 +281,6 @@ export default function HandReplayer({ hand, onBack }: HandReplayerProps) {
           <p>{hand.result.notes}</p>
         </div>
       )}
-      <div className={`replay-result ${hand.result.netAmount >= 0 ? 'positive' : 'negative'}`}>
-        結果: {hand.result.netAmount >= 0 ? '+' : ''}
-        {unit === 'bb' ? formatBB(hand.result.netAmount, hand.stakes.bb) : `${hand.result.netAmount}${hand.stakes.currency}`}
-        {hero ? ` (${hero.position})` : ''}
-      </div>
 
       {/* <AiReview hand={hand} /> */}
     </div>

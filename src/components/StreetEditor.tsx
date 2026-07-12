@@ -101,7 +101,6 @@ export default function StreetEditor({
 
       {boardCount > 0 && (
         <CardPicker
-          label="ボードカード"
           count={boardCount}
           value={data.board}
           onChange={(board) => onChange({ ...data, board })}
@@ -109,37 +108,31 @@ export default function StreetEditor({
         />
       )}
 
-      <ol className="action-list">
-        {data.actions.map((a) => (
-          <li key={a.id} className="action-item">
-            <span className="action-player">{positionOf(a.playerId)}</span>
-            <span className={`action-type action-${a.type}`}>{ACTION_LABELS[a.type]}</span>
-            {a.amount !== undefined && a.amount > 0 && (
-              <span className="action-amount">
-                合計 {a.amount} ({formatBB(a.amount, stakes.bb)})
-              </span>
-            )}
-            <button
-              type="button"
-              className="action-remove"
-              onClick={() => removeAction(a.id)}
-              aria-label="このアクションを削除"
-            >
-              ×
-            </button>
-          </li>
-        ))}
-        {data.actions.length === 0 && (
-          <li className="action-empty">
-            アクションなし
-            {street === 'preflop' && contribution.total > 0 && ` (ブラインド ${contribution.total} は投入済み)`}
-          </li>
-        )}
-      </ol>
+      {data.actions.length > 0 && (
+        <ol className="action-list">
+          {data.actions.map((a) => (
+            <li key={a.id} className="action-item">
+              <span className="action-player">{positionOf(a.playerId)}</span>
+              <span className={`action-type action-${a.type}`}>{ACTION_LABELS[a.type]}</span>
+              {a.amount !== undefined && a.amount > 0 && (
+                <span className="action-amount">
+                  合計 {a.amount} ({formatBB(a.amount, stakes.bb)})
+                </span>
+              )}
+              <button
+                type="button"
+                className="action-remove"
+                onClick={() => removeAction(a.id)}
+                aria-label="このアクションを削除"
+              >
+                ×
+              </button>
+            </li>
+          ))}
+        </ol>
+      )}
 
-      {players.length === 0 ? (
-        <p className="action-empty">このストリートに残っているポジションがありません</p>
-      ) : (
+      {players.length > 0 && (
         <div className="action-add-form">
           <div className="action-add-row">
             <label className="action-position-label">
@@ -183,10 +176,6 @@ export default function StreetEditor({
               アクションを追加
             </button>
           </div>
-          <p className="action-hint">
-            現在のコール額: {betTo} ({formatBB(betTo, stakes.bb)}) ・ {positionOf(playerId)}の残りスタック:{' '}
-            {remainingStack} ({formatBB(remainingStack, stakes.bb)})
-          </p>
         </div>
       )}
 

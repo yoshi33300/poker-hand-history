@@ -16,11 +16,11 @@ export interface StreetContribution {
   total: number
 }
 
+// Ante is posted entirely by the BB (the "big blind ante" format), not by every player.
 export function blindBaseline(player: Player, stakes: Hand['stakes']): number {
-  let base = stakes.ante ?? 0
-  if (player.position === 'SB') base += stakes.sb
-  if (player.position === 'BB') base += stakes.bb
-  return base
+  if (player.position === 'SB') return stakes.sb
+  if (player.position === 'BB') return stakes.bb + (stakes.ante ?? 0)
+  return 0
 }
 
 export function streetContribution(
@@ -68,6 +68,22 @@ export function totalPot(hand: Pick<Hand, 'players' | 'stakes' | 'streets'>): nu
     pot += streetContribution(street, hand.streets[street], hand.players, hand.stakes).total
   }
   return pot
+}
+
+/** Preflop pot-type label from the number of raises before the flop: SRP, 3BP, 4BP, 5BP... */
+export function preflopPotType(hand: Pick<Hand, 'players' | 'stakes' | 'streets'>): string {
+  let currentMax = 0
+  for (const p of hand.players) currentMax = Math.max(currentMax, blindBaseline(p, hand.stakes))
+  let raises = 0
+  for (const action of hand.streets.preflop.actions) {
+    if (action.amount !== undefined && action.amount > currentMax) {
+      raises++
+      currentMax = action.amount
+    }
+  }
+  if (raises === 0) return ''
+  if (raises === 1) return 'SRP'
+  return `${raises + 1}BP`
 }
 
 /** A player's remaining stack at the start of `street` (before this street's own actions). */

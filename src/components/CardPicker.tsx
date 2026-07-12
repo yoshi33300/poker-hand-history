@@ -5,14 +5,13 @@ import PlayingCard from './PlayingCard'
 import SuitIcon from './SuitIcon'
 
 interface CardPickerProps {
-  label: string
   count: number
   value: CardCode[]
   onChange: (cards: CardCode[]) => void
   usedElsewhere: CardCode[]
 }
 
-export default function CardPicker({ label, count, value, onChange, usedElsewhere }: CardPickerProps) {
+export default function CardPicker({ count, value, onChange, usedElsewhere }: CardPickerProps) {
   const [openSlot, setOpenSlot] = useState<number | null>(null)
 
   const slots = Array.from({ length: count }, (_, i) => value[i])
@@ -33,7 +32,6 @@ export default function CardPicker({ label, count, value, onChange, usedElsewher
 
   return (
     <div className="card-picker">
-      <div className="card-picker-label">{label}</div>
       <div className="card-picker-slots">
         {slots.map((code, i) => (
           <button

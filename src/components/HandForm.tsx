@@ -1,11 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createId } from '../id'
 import { createDefaultPlayers, orderForStreet } from '../players'
-import { formatCard } from '../cards'
 import { saveHand } from '../db'
-import { potBeforeStreet, stackBeforeStreet } from '../pot'
+import { potBeforeStreet, preflopPotType, stackBeforeStreet } from '../pot'
 import { STREETS } from '../types'
-import type { CardCode, GameType, Hand, Player, Street, StreetData } from '../types'
+import type { CardCode, Hand, Player, Street, StreetData } from '../types'
 import CardPicker from './CardPicker'
 import PositionsEditor from './PositionsEditor'
 import StreetEditor from './StreetEditor'
@@ -18,7 +17,7 @@ interface HandFormProps {
 
 export default function HandForm({ onSaved }: HandFormProps) {
   const [title, setTitle] = useState('')
-  const [gameType, setGameType] = useState<GameType>('NLH')
+  const gameType = 'NLH' as const
   const [sb, setSb] = useState(1)
   const [bb, setBb] = useState(2)
   const [ante, setAnte] = useState(0)
@@ -33,6 +32,15 @@ export default function HandForm({ onSaved }: HandFormProps) {
   })
   const [netAmount, setNetAmount] = useState(0)
   const [notes, setNotes] = useState('')
+
+  // BB changes always re-baseline every player's stack to 100bb.
+  const prevBbRef = useRef(bb)
+  useEffect(() => {
+    if (prevBbRef.current !== bb) {
+      setPlayers((prev) => prev.map((p) => ({ ...p, startingStack: bb * 100 })))
+      prevBbRef.current = bb
+    }
+  }, [bb])
 
   const hero = players.find((p) => p.isHero)
   const stakes = { sb, bb, ante, currency }
@@ -76,10 +84,22 @@ export default function HandForm({ onSaved }: HandFormProps) {
   }
 
   function autoTitle(): string {
-    const cards = heroHoleCards.map(formatCard).join(' ')
-    if (cards && hero) return `${cards} @ ${hero.position}`
-    if (hero) return `${hero.position}のハンド`
-    return '無題のハンド'
+    if (!hero) return '無題のハンド'
+    const folded = new Set<string>()
+    const acted = new Set<string>()
+    for (const street of STREETS) {
+      for (const action of streets[street].actions) {
+        acted.add(action.playerId)
+        if (action.type === 'fold') folded.add(action.playerId)
+      }
+    }
+    const opponents = players.filter((p) => p.id !== hero.id && acted.has(p.id) && !folded.has(p.id))
+    const potType = preflopPotType(handSnapshot)
+    if (opponents.length > 0) {
+      const matchup = [hero.position, ...opponents.map((p) => p.position)].join('vs')
+      return potType ? `${matchup} (${potType})` : matchup
+    }
+    return `${hero.position}のハンド`
   }
 
   function resetForm() {
@@ -133,13 +153,6 @@ export default function HandForm({ onSaved }: HandFormProps) {
               placeholder={autoTitle()}
             />
           </label>
-          <label>
-            ゲーム種別
-            <select value={gameType} onChange={(e) => setGameType(e.target.value as GameType)}>
-              <option value="NLH">NLH (テキサスホールデム)</option>
-              <option value="PLO">PLO (オマハ)</option>
-            </select>
-          </label>
         </div>
         <div className="field-row">
           <label>
@@ -159,9 +172,6 @@ export default function HandForm({ onSaved }: HandFormProps) {
             <input type="number" min={0} value={ante} onChange={(e) => setAnte(Number(e.target.value))} />
           </label>
         </div>
-        <p className="form-hint">
-          SB/BB/アンティは最初からポットに投入済みとして自動計上されます。各アクションの金額は「そのストリートでの合計投入額」を入力してください(例: BBがレイズに対してコールする場合、ブラインド分を含めた合計額)。
-        </p>
       </section>
 
       <section className="form-section">
@@ -172,7 +182,6 @@ export default function HandForm({ onSaved }: HandFormProps) {
       <section className="form-section">
         <h3>自分のホールカード {hero ? `(${hero.position})` : ''}</h3>
         <CardPicker
-          label="ホールカード"
           count={2}
           value={heroHoleCards}
           onChange={setHeroHoleCards}
@@ -196,13 +205,7 @@ export default function HandForm({ onSaved }: HandFormProps) {
       ))}
 
       <section className="form-section">
-        <h3>結果</h3>
-        <div className="field-row">
-          <label>
-            収支 ({currency})
-            <input type="number" value={netAmount} onChange={(e) => setNetAmount(Number(e.target.value))} />
-          </label>
-        </div>
+        <h3>メモ</h3>
         <label className="notes-label">
           メモ
           <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} />

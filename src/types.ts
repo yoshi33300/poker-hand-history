@@ -16,7 +16,7 @@ export type Position =
   | 'SB'
   | 'BB'
 
-export type GameType = 'NLH' | 'PLO'
+export type GameType = 'NLH'
 
 export type Street = 'preflop' | 'flop' | 'turn' | 'river'
 

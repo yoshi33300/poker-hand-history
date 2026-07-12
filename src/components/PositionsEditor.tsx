@@ -44,12 +44,13 @@ export default function PositionsEditor({ players, onChange, defaultStack, bb }:
           <input
             type="number"
             min={0}
+            step={10}
             defaultValue={defaultStack}
+            key={defaultStack}
             onChange={(e) => setAllStacks(Number(e.target.value))}
           />
         </label>
       </div>
-      <p className="positions-hint">プリフロップのアクション順に並んでいます。自分のポジションを選んでください。</p>
       <div className="positions-list">
         {players.map((p, i) => (
           <label key={p.id} className={`position-row ${p.isHero ? 'hero-row' : ''}`}>
@@ -67,6 +68,7 @@ export default function PositionsEditor({ players, onChange, defaultStack, bb }:
               className="position-stack"
               type="number"
               min={0}
+              step={10}
               value={p.startingStack}
               onChange={(e) => updateStack(p.id, Number(e.target.value))}
               aria-label={`${p.position}のスタック`}
