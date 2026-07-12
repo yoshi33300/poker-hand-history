@@ -58,8 +58,10 @@ export default function PokerTable({ hand, state, actingPlayerId, visibleIds, fo
         player,
         x: 50 + 42 * cos,
         y: 50 + 42 * sin,
-        betX: 50 + 24 * cos,
-        betY: 50 + 23 * sin,
+        // Bet pills sit between the seat and the pot; their radius is a CSS
+        // variable so mobile can push them outward to avoid the board.
+        betCos: cos,
+        betSin: sin,
         buttonX: 50 + 31 * Math.cos(theta - 0.45),
         buttonY: 50 + 29 * Math.sin(theta - 0.45),
       }
@@ -132,13 +134,20 @@ export default function PokerTable({ hand, state, actingPlayerId, visibleIds, fo
         )
       })}
 
-      {seats.map(({ player: p, betX, betY }) => {
+      {seats.map(({ player: p, betCos, betSin }) => {
         // Chips stay on the table after a fold until the street ends.
         if (!visibleIds.has(p.id)) return null
         const bet = state.streetContrib[p.id] ?? 0
         if (bet <= 0) return null
         return (
-          <div key={`bet-${p.id}`} className="seat-bet" style={{ left: `${betX}%`, top: `${betY}%` }}>
+          <div
+            key={`bet-${p.id}`}
+            className="seat-bet"
+            style={{
+              left: `calc(50% + ${betCos.toFixed(4)} * var(--bet-rx))`,
+              top: `calc(50% + ${betSin.toFixed(4)} * var(--bet-ry))`,
+            }}
+          >
             <span className="seat-bet-chip" />
             {formatAmount(bet)}
           </div>
