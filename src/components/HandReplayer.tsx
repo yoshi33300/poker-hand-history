@@ -18,6 +18,7 @@ type TimelineEvent =
 interface HandReplayerProps {
   hand: Hand
   onBack: () => void
+  onEdit: (hand: Hand) => void
 }
 
 // Blinds/antes are chips already on the table before anyone acts, so they are
@@ -90,7 +91,7 @@ function computeState(hand: Hand, events: TimelineEvent[], index: number): Table
   }
 }
 
-export default function HandReplayer({ hand, onBack }: HandReplayerProps) {
+export default function HandReplayer({ hand, onBack, onEdit }: HandReplayerProps) {
   const events = useMemo(() => buildTimeline(hand), [hand])
   const [step, setStep] = useState(0)
   const [playing, setPlaying] = useState(false)
@@ -184,6 +185,9 @@ export default function HandReplayer({ hand, onBack }: HandReplayerProps) {
         <button type="button" className="back-button" onClick={onBack}>
           ← 一覧に戻る
         </button>
+        <button type="button" className="edit-button" onClick={() => onEdit(hand)}>
+          編集
+        </button>
         <button type="button" className="share-button" onClick={handleShare}>
           {copied ? 'コピーしました' : '共有'}
         </button>
@@ -274,6 +278,16 @@ export default function HandReplayer({ hand, onBack }: HandReplayerProps) {
           </div>
         ))}
       </div>
+
+      {hand.result.winnerIds && hand.result.winnerIds.length > 0 && (
+        <div className="replay-result-row">
+          <span>勝者: {hand.result.winnerIds.map(positionOf).join(', ')}</span>
+          <span className={`replay-result ${hand.result.netAmount >= 0 ? 'positive' : 'negative'}`}>
+            HERO {hand.result.netAmount >= 0 ? '+' : ''}
+            {formatAmount(hand.result.netAmount)}
+          </span>
+        </div>
+      )}
 
       {hand.result.notes && (
         <div className="replay-notes">

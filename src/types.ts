@@ -74,6 +74,8 @@ export interface Hand {
   }
   result: {
     netAmount: number
+    /** Players who won the pot (multiple = chop). Absent on hands saved before winner tracking. */
+    winnerIds?: string[]
     notes: string
   }
 }

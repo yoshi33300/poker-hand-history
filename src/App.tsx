@@ -10,6 +10,8 @@ type View = 'list' | 'form' | 'replay'
 function App() {
   const [view, setView] = useState<View>('list')
   const [selectedHand, setSelectedHand] = useState<Hand | null>(null)
+  // Hand being edited in the form; null means the form is creating a new one.
+  const [editingHand, setEditingHand] = useState<Hand | null>(null)
   const [refreshToken, setRefreshToken] = useState(0)
 
   function openHand(hand: Hand) {
@@ -17,9 +19,24 @@ function App() {
     setView('replay')
   }
 
-  function handleSaved() {
+  function startNewHand() {
+    setEditingHand(null)
+    setView('form')
+  }
+
+  function startEditHand(hand: Hand) {
+    setEditingHand(hand)
+    setView('form')
+  }
+
+  function handleSaved(hand: Hand) {
     setRefreshToken((t) => t + 1)
-    setView('list')
+    setSelectedHand(hand)
+    setView('replay')
+  }
+
+  function handleCancelForm() {
+    setView(editingHand ? 'replay' : 'list')
   }
 
   return (
@@ -30,7 +47,7 @@ function App() {
           <button type="button" className={view === 'list' ? 'active' : ''} onClick={() => setView('list')}>
             ハンド一覧
           </button>
-          <button type="button" className={view === 'form' ? 'active' : ''} onClick={() => setView('form')}>
+          <button type="button" className={view === 'form' ? 'active' : ''} onClick={startNewHand}>
             + 新規記録
           </button>
         </nav>
@@ -38,9 +55,16 @@ function App() {
 
       <main className="app-main">
         {view === 'list' && <HandList refreshToken={refreshToken} onOpen={openHand} />}
-        {view === 'form' && <HandForm onSaved={handleSaved} />}
+        {view === 'form' && (
+          <HandForm
+            key={editingHand?.id ?? 'new'}
+            hand={editingHand ?? undefined}
+            onSaved={handleSaved}
+            onCancel={handleCancelForm}
+          />
+        )}
         {view === 'replay' && selectedHand && (
-          <HandReplayer hand={selectedHand} onBack={() => setView('list')} />
+          <HandReplayer hand={selectedHand} onBack={() => setView('list')} onEdit={startEditHand} />
         )}
       </main>
     </div>

@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { createId } from '../id'
 import { createDefaultPlayers, orderForStreet } from '../players'
 import { saveHand } from '../db'
-import { potBeforeStreet, preflopPotType, stackBeforeStreet } from '../pot'
+import { heroNetAmount, potBeforeStreet, preflopPotType, stackBeforeStreet, survivors } from '../pot'
+import { formatBB } from '../bb'
 import { STREETS } from '../types'
 import { useIsNarrow } from '../useIsNarrow'
 import type { CardCode, Hand, Player, Street, StreetData } from '../types'
@@ -20,26 +21,32 @@ const BLIND_CHOICES = [
 ]
 
 interface HandFormProps {
+  /** Existing hand to edit. Omit to create a new one. */
+  hand?: Hand
   onSaved: (hand: Hand) => void
+  onCancel?: () => void
 }
 
-export default function HandForm({ onSaved }: HandFormProps) {
-  const [title, setTitle] = useState('')
+export default function HandForm({ hand, onSaved, onCancel }: HandFormProps) {
+  const [title, setTitle] = useState(hand?.title ?? '')
   const gameType = 'NLH' as const
-  const [sb, setSb] = useState(1)
-  const [bb, setBb] = useState(2)
-  const [ante, setAnte] = useState(0)
-  const [currency, setCurrency] = useState('$')
-  const [players, setPlayers] = useState<Player[]>(() => createDefaultPlayers(6, 200))
-  const [heroHoleCards, setHeroHoleCards] = useState<CardCode[]>([])
-  const [streets, setStreets] = useState<Record<Street, StreetData>>({
-    preflop: emptyStreetData(),
-    flop: emptyStreetData(),
-    turn: emptyStreetData(),
-    river: emptyStreetData(),
-  })
-  const [netAmount, setNetAmount] = useState(0)
-  const [notes, setNotes] = useState('')
+  const [sb, setSb] = useState(hand?.stakes.sb ?? 1)
+  const [bb, setBb] = useState(hand?.stakes.bb ?? 2)
+  const [ante, setAnte] = useState(hand?.stakes.ante ?? 0)
+  const [currency, setCurrency] = useState(hand?.stakes.currency ?? '$')
+  const [players, setPlayers] = useState<Player[]>(() => hand?.players ?? createDefaultPlayers(6, 200))
+  const [heroHoleCards, setHeroHoleCards] = useState<CardCode[]>(hand?.heroHoleCards ?? [])
+  const [streets, setStreets] = useState<Record<Street, StreetData>>(
+    () =>
+      hand?.streets ?? {
+        preflop: emptyStreetData(),
+        flop: emptyStreetData(),
+        turn: emptyStreetData(),
+        river: emptyStreetData(),
+      },
+  )
+  const [winnerIds, setWinnerIds] = useState<string[]>(hand?.result.winnerIds ?? [])
+  const [notes, setNotes] = useState(hand?.result.notes ?? '')
   const isNarrow = useIsNarrow()
   // Which blind field the drum-roll picker is editing on mobile.
   const [blindPicker, setBlindPicker] = useState<null | 'sb' | 'bb' | 'ante'>(null)
@@ -56,6 +63,22 @@ export default function HandForm({ onSaved }: HandFormProps) {
   const hero = players.find((p) => p.isHero)
   const stakes = { sb, bb, ante, currency }
   const handSnapshot = { players, stakes, streets }
+
+  // Winner candidates and hero's net are derived live from the recorded actions.
+  const survivorsAtEnd = survivors(handSnapshot)
+  const hasAnyAction = STREETS.some((s) => streets[s].actions.length > 0)
+  const aliveWinnerIds = winnerIds.filter((id) => survivorsAtEnd.some((p) => p.id === id))
+  // A lone survivor won the hand by definition — no tap needed.
+  const effectiveWinnerIds =
+    hasAnyAction && survivorsAtEnd.length === 1 ? [survivorsAtEnd[0].id] : aliveWinnerIds
+  const netAmount = heroNetAmount(handSnapshot, effectiveWinnerIds)
+  const heroFolded = hero
+    ? STREETS.some((s) => streets[s].actions.some((a) => a.playerId === hero.id && a.type === 'fold'))
+    : false
+
+  function toggleWinner(id: string) {
+    setWinnerIds((prev) => (prev.includes(id) ? prev.filter((w) => w !== id) : [...prev, id]))
+  }
 
   /** Players still in the hand when this street starts, in action order. */
   function playersFor(street: Street): Player[] {
@@ -122,14 +145,14 @@ export default function HandForm({ onSaved }: HandFormProps) {
       turn: emptyStreetData(),
       river: emptyStreetData(),
     })
-    setNetAmount(0)
+    setWinnerIds([])
     setNotes('')
   }
 
   async function handleSave() {
-    const hand: Hand = {
-      id: createId(),
-      createdAt: Date.now(),
+    const savedHand: Hand = {
+      id: hand?.id ?? createId(),
+      createdAt: hand?.createdAt ?? Date.now(),
       title: title.trim() || autoTitle(),
       gameType,
       stakes,
@@ -141,16 +164,16 @@ export default function HandForm({ onSaved }: HandFormProps) {
         turn: streets.turn,
         river: streets.river,
       },
-      result: { netAmount, notes },
+      result: { netAmount, winnerIds: effectiveWinnerIds, notes },
     }
-    await saveHand(hand)
-    onSaved(hand)
-    resetForm()
+    await saveHand(savedHand)
+    onSaved(savedHand)
+    if (!hand) resetForm()
   }
 
   return (
     <div className="hand-form">
-      <h2>ハンドを記録</h2>
+      <h2>{hand ? 'ハンドを編集' : 'ハンドを記録'}</h2>
 
       <section className="form-section">
         <h3>基本情報</h3>
@@ -243,6 +266,40 @@ export default function HandForm({ onSaved }: HandFormProps) {
       ))}
 
       <section className="form-section">
+        <h3>結果</h3>
+        {hasAnyAction ? (
+          <div className="result-editor">
+            <span className="result-label">勝者 (チョップは複数選択)</span>
+            <div className="action-type-buttons" role="group" aria-label="勝者">
+              {survivorsAtEnd.map((p) => (
+                <button
+                  type="button"
+                  key={p.id}
+                  className={`action-type-button ${effectiveWinnerIds.includes(p.id) ? 'selected' : ''}`}
+                  onClick={() => toggleWinner(p.id)}
+                >
+                  {p.position}
+                  {p.isHero ? ' (自分)' : ''}
+                </button>
+              ))}
+            </div>
+            {effectiveWinnerIds.length > 0 || heroFolded ? (
+              <p className={`result-net ${netAmount > 0 ? 'positive' : netAmount < 0 ? 'negative' : ''}`}>
+                収支: {netAmount >= 0 ? '+' : ''}
+                {netAmount}
+                {currency} ({netAmount > 0 ? '+' : ''}
+                {formatBB(netAmount, bb)})
+              </p>
+            ) : (
+              <p className="result-hint">勝者を選ぶと収支を自動計算します</p>
+            )}
+          </div>
+        ) : (
+          <p className="result-hint">アクションを入力すると勝者を選択できます</p>
+        )}
+      </section>
+
+      <section className="form-section">
         <h3>メモ</h3>
         <label className="notes-label">
           メモ
@@ -251,8 +308,13 @@ export default function HandForm({ onSaved }: HandFormProps) {
       </section>
 
       <div className="form-actions">
+        {onCancel && (
+          <button type="button" className="secondary" onClick={onCancel}>
+            キャンセル
+          </button>
+        )}
         <button type="button" className="primary" onClick={handleSave}>
-          保存する
+          {hand ? '更新する' : '保存する'}
         </button>
       </div>
 

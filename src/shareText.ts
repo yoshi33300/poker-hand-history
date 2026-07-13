@@ -72,6 +72,16 @@ export function buildHandText(hand: Hand): string {
     lines.push('')
   }
 
+  const winners = hand.result.winnerIds ?? []
+  if (winners.length > 0) {
+    const net = hand.result.netAmount
+    const sign = net > 0 ? '+' : ''
+    lines.push(
+      `勝者: ${winners.map((id) => positionOf(hand, id)).join(', ')} / HERO ${sign}${net}${hand.stakes.currency} (${sign}${formatBB(net, hand.stakes.bb)})`,
+    )
+    lines.push('')
+  }
+
   if (hand.result.notes) {
     lines.push(`メモ: ${hand.result.notes}`)
   }

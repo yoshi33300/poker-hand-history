@@ -105,6 +105,7 @@
 .form-actions {
   display: flex;
   justify-content: flex-end;
+  gap: 0.6rem;
   margin-top: 1rem;
 }
 
@@ -120,6 +121,20 @@ button.primary {
 
 button.primary:hover {
   background: var(--accent-hover);
+}
+
+button.secondary {
+  background: none;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.7rem 1.6rem;
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+button.secondary:hover {
+  border-color: var(--text);
 }
 
 /* ---- Positions editor ---- */
@@ -775,6 +790,63 @@ button.primary:hover {
 
 /* ---- Hand list ---- */
 
+.hand-list-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  margin-bottom: 0.8rem;
+}
+
+.hand-list-toolbar button {
+  padding: 0.45rem 1rem;
+  font-size: 0.85rem;
+}
+
+.hand-list-selection-count {
+  margin-right: auto;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.1rem;
+  height: 2.1rem;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: none;
+  color: var(--text);
+}
+
+.icon-button:hover:not(:disabled) {
+  border-color: var(--text);
+}
+
+.icon-button:disabled {
+  opacity: 0.4;
+}
+
+.icon-button.danger {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+.icon-button.danger:hover:not(:disabled) {
+  background: var(--danger-soft, rgba(220, 60, 60, 0.12));
+}
+
+.hand-list-status {
+  font-size: 0.85rem;
+  color: var(--text);
+  opacity: 0.8;
+  margin: 0 0 0.8rem;
+}
+
 .hand-list {
   list-style: none;
   padding: 0;
@@ -799,6 +871,18 @@ button.primary:hover {
   border: 1px solid var(--border);
   border-radius: 10px;
   overflow: hidden;
+}
+
+.hand-list-item.selected {
+  border-color: var(--accent);
+  background: var(--accent-soft, rgba(52, 184, 114, 0.08));
+}
+
+.hand-select-checkbox {
+  flex-shrink: 0;
+  width: 1.2rem;
+  margin-left: 1rem;
+  align-self: center;
 }
 
 .hand-list-item-main {
@@ -860,14 +944,6 @@ button.primary:hover {
   color: var(--danger);
 }
 
-.hand-list-delete {
-  border: none;
-  border-left: 1px solid var(--border);
-  background: none;
-  color: var(--danger);
-  padding: 0 1rem;
-}
-
 /* ---- Replayer ---- */
 
 .hand-replayer {
@@ -892,7 +968,8 @@ button.primary:hover {
   padding: 0;
 }
 
-.share-button {
+.share-button,
+.edit-button {
   padding: 0.4rem 0.9rem;
   border: 1px solid var(--accent);
   border-radius: 8px;
@@ -902,7 +979,8 @@ button.primary:hover {
   font-size: 0.85rem;
 }
 
-.share-button:hover {
+.share-button:hover,
+.edit-button:hover {
   background: var(--accent-soft, rgba(52, 184, 114, 0.12));
 }
 
@@ -1543,6 +1621,52 @@ button.primary:hover {
 
 .replay-result.negative {
   color: var(--danger);
+}
+
+.replay-result-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.6rem 1rem;
+}
+
+/* ---- Result (winner / net) editor ---- */
+
+.result-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.result-label {
+  font-size: 0.8rem;
+  color: var(--text);
+}
+
+.result-net {
+  margin: 0;
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: var(--text-h);
+}
+
+.result-net.positive {
+  color: var(--accent);
+}
+
+.result-net.negative {
+  color: var(--danger);
+}
+
+.result-hint {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text);
+  opacity: 0.75;
 }
 
 /* ---- AI review ---- */

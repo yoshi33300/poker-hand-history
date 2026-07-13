@@ -103,6 +103,68 @@ export function effectiveStack(hand: Pick<Hand, 'players' | 'streets'>): number 
   return pool.reduce((min, p) => Math.min(min, p.startingStack), Infinity)
 }
 
+/** Total chips a player committed across the whole hand (blinds included). */
+export function totalContribution(
+  hand: Pick<Hand, 'players' | 'stakes' | 'streets'>,
+  playerId: string,
+): number {
+  let total = 0
+  for (const street of STREETS) {
+    total += streetContribution(street, hand.streets[street], hand.players, hand.stakes).perPlayer[playerId] ?? 0
+  }
+  return total
+}
+
+/**
+ * Players eligible to win the pot: joined the action (or posted a blind, so a
+ * walk still has its winner) and never folded.
+ */
+export function survivors(hand: Pick<Hand, 'players' | 'streets'>): Player[] {
+  const acted = new Set<string>()
+  const folded = new Set<string>()
+  for (const street of STREETS) {
+    for (const a of hand.streets[street].actions) {
+      acted.add(a.playerId)
+      if (a.type === 'fold') folded.add(a.playerId)
+    }
+  }
+  return hand.players.filter(
+    (p) => !folded.has(p.id) && (acted.has(p.id) || p.position === 'SB' || p.position === 'BB'),
+  )
+}
+
+/**
+ * Hero's net result once the winners are known. A sole winner's gain from each
+ * opponent is capped at hero's own total contribution, so short-stack all-in
+ * wins stay correct without full side-pot bookkeeping. A chop splits the whole
+ * pot evenly, which assumes the winners were equally invested (the usual case).
+ */
+export function heroNetAmount(
+  hand: Pick<Hand, 'players' | 'stakes' | 'streets'>,
+  winnerIds: string[],
+): number {
+  const hero = hand.players.find((p) => p.isHero)
+  if (!hero) return 0
+  const round2 = (v: number) => Math.round(v * 100) / 100
+  const heroPut = totalContribution(hand, hero.id)
+  if (winnerIds.length === 0) {
+    // No winner recorded: a fold still costs what hero put in; otherwise stay neutral.
+    const heroFolded = STREETS.some((s) =>
+      hand.streets[s].actions.some((a) => a.playerId === hero.id && a.type === 'fold'),
+    )
+    return heroFolded ? -round2(heroPut) : 0
+  }
+  if (!winnerIds.includes(hero.id)) return -round2(heroPut)
+  if (winnerIds.length === 1) {
+    let won = 0
+    for (const p of hand.players) {
+      if (p.id !== hero.id) won += Math.min(totalContribution(hand, p.id), heroPut)
+    }
+    return round2(won)
+  }
+  return round2(totalPot(hand) / winnerIds.length - heroPut)
+}
+
 /** A player's remaining stack at the start of `street` (before this street's own actions). */
 export function stackBeforeStreet(
   hand: Pick<Hand, 'players' | 'stakes' | 'streets'>,
