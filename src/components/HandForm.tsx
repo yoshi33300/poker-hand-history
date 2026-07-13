@@ -3,6 +3,7 @@ import { createId } from '../id'
 import { createDefaultPlayers, orderForStreet } from '../players'
 import { saveHand } from '../db'
 import { heroNetAmount, potBeforeStreet, preflopPotType, stackBeforeStreet, survivors } from '../pot'
+import { determineShowdownWinners } from '../handRank'
 import { formatBB } from '../bb'
 import { STREETS } from '../types'
 import { useIsNarrow } from '../useIsNarrow'
@@ -33,6 +34,7 @@ export default function HandForm({ hand, onSaved, onCancel }: HandFormProps) {
   const [sb, setSb] = useState(hand?.stakes.sb ?? 1)
   const [bb, setBb] = useState(hand?.stakes.bb ?? 2)
   const [ante, setAnte] = useState(hand?.stakes.ante ?? 0)
+  const [anteMode, setAnteMode] = useState<'bb' | 'all'>(hand?.stakes.anteMode ?? 'bb')
   const [currency, setCurrency] = useState(hand?.stakes.currency ?? '$')
   const [players, setPlayers] = useState<Player[]>(() => hand?.players ?? createDefaultPlayers(6, 200))
   const [heroHoleCards, setHeroHoleCards] = useState<CardCode[]>(hand?.heroHoleCards ?? [])
@@ -46,6 +48,8 @@ export default function HandForm({ hand, onSaved, onCancel }: HandFormProps) {
       },
   )
   const [winnerIds, setWinnerIds] = useState<string[]>(hand?.result.winnerIds ?? [])
+  // Opponent hole cards revealed at showdown, keyed by player id — lets the app judge the winner itself.
+  const [villainCards, setVillainCards] = useState<Record<string, CardCode[]>>(hand?.villainCards ?? {})
   const [notes, setNotes] = useState(hand?.result.notes ?? '')
   const isNarrow = useIsNarrow()
   // Which blind field the drum-roll picker is editing on mobile.
@@ -61,16 +65,34 @@ export default function HandForm({ hand, onSaved, onCancel }: HandFormProps) {
   }, [bb])
 
   const hero = players.find((p) => p.isHero)
-  const stakes = { sb, bb, ante, currency }
+  const stakes = { sb, bb, ante, anteMode, currency }
   const handSnapshot = { players, stakes, streets }
 
   // Winner candidates and hero's net are derived live from the recorded actions.
   const survivorsAtEnd = survivors(handSnapshot)
   const hasAnyAction = STREETS.some((s) => streets[s].actions.length > 0)
-  const aliveWinnerIds = winnerIds.filter((id) => survivorsAtEnd.some((p) => p.id === id))
-  // A lone survivor won the hand by definition — no tap needed.
-  const effectiveWinnerIds =
-    hasAnyAction && survivorsAtEnd.length === 1 ? [survivorsAtEnd[0].id] : aliveWinnerIds
+  const allBoardCards = [...streets.flop.board, ...streets.turn.board, ...streets.river.board]
+  const boardComplete = allBoardCards.length === 5
+
+  function holeCardsOf(p: Player): CardCode[] {
+    return p.isHero ? heroHoleCards : (villainCards[p.id] ?? [])
+  }
+
+  // With everyone's cards and a full board known, the app can judge the showdown itself.
+  const showdownReady =
+    survivorsAtEnd.length > 1 && boardComplete && survivorsAtEnd.every((p) => holeCardsOf(p).length === 2)
+  const showdownResult = showdownReady
+    ? determineShowdownWinners(
+        allBoardCards,
+        survivorsAtEnd.map((p) => ({ id: p.id, holeCards: holeCardsOf(p) })),
+      )
+    : null
+
+  const manualWinnerIds = winnerIds.filter((id) => survivorsAtEnd.some((p) => p.id === id))
+  // A lone survivor won the hand by definition; otherwise defer to the showdown result, then a manual pick.
+  const autoWinnerIds =
+    hasAnyAction && survivorsAtEnd.length === 1 ? [survivorsAtEnd[0].id] : (showdownResult?.winnerIds ?? null)
+  const effectiveWinnerIds = autoWinnerIds ?? manualWinnerIds
   const netAmount = heroNetAmount(handSnapshot, effectiveWinnerIds)
   const heroFolded = hero
     ? STREETS.some((s) => streets[s].actions.some((a) => a.playerId === hero.id && a.type === 'fold'))
@@ -80,20 +102,30 @@ export default function HandForm({ hand, onSaved, onCancel }: HandFormProps) {
     setWinnerIds((prev) => (prev.includes(id) ? prev.filter((w) => w !== id) : [...prev, id]))
   }
 
-  /** Players still in the hand when this street starts, in action order. */
+  function positionOf(id: string): string {
+    return players.find((p) => p.id === id)?.position ?? '?'
+  }
+
+  /**
+   * Players still in the hand when this street starts, in action order.
+   * SB/BB count as "in" even with no recorded preflop action — they posted a
+   * blind, so a limped pot (e.g. BB never explicitly checks) doesn't silently
+   * drop them from the flop onward.
+   */
   function playersFor(street: Street): Player[] {
     const streetIndex = STREETS.indexOf(street)
     let list = players
     if (streetIndex > 0) {
       const acted = new Set(streets.preflop.actions.map((a) => a.playerId))
-      list = list.filter((p) => acted.has(p.id))
       const folded = new Set<string>()
       for (let i = 0; i < streetIndex; i++) {
         for (const a of streets[STREETS[i]].actions) {
           if (a.type === 'fold') folded.add(a.playerId)
         }
       }
-      list = list.filter((p) => !folded.has(p.id))
+      list = list.filter(
+        (p) => !folded.has(p.id) && (acted.has(p.id) || p.position === 'SB' || p.position === 'BB'),
+      )
     }
     return orderForStreet(street, list)
   }
@@ -109,6 +141,16 @@ export default function HandForm({ hand, onSaved, onCancel }: HandFormProps) {
     if (exclude !== 'hole') cards.push(...heroHoleCards)
     for (const s of STREETS) {
       if (s !== exclude) cards.push(...streets[s].board)
+    }
+    for (const cs of Object.values(villainCards)) cards.push(...cs)
+    return cards
+  }
+
+  function usedCardsForVillain(playerId: string): CardCode[] {
+    const cards = [...heroHoleCards]
+    for (const s of STREETS) cards.push(...streets[s].board)
+    for (const [pid, cs] of Object.entries(villainCards)) {
+      if (pid !== playerId) cards.push(...cs)
     }
     return cards
   }
@@ -146,10 +188,16 @@ export default function HandForm({ hand, onSaved, onCancel }: HandFormProps) {
       river: emptyStreetData(),
     })
     setWinnerIds([])
+    setVillainCards({})
     setNotes('')
   }
 
   async function handleSave() {
+    // Drop showdown cards for anyone who's no longer a candidate (e.g. folded after being entered).
+    const savedVillainCards: Record<string, CardCode[]> = {}
+    for (const p of survivorsAtEnd) {
+      if (!p.isHero && holeCardsOf(p).length === 2) savedVillainCards[p.id] = holeCardsOf(p)
+    }
     const savedHand: Hand = {
       id: hand?.id ?? createId(),
       createdAt: hand?.createdAt ?? Date.now(),
@@ -158,6 +206,7 @@ export default function HandForm({ hand, onSaved, onCancel }: HandFormProps) {
       stakes,
       players,
       heroHoleCards,
+      villainCards: savedVillainCards,
       streets: {
         preflop: streets.preflop,
         flop: streets.flop,
@@ -233,6 +282,27 @@ export default function HandForm({ hand, onSaved, onCancel }: HandFormProps) {
             />
           </label>
         </div>
+        {ante > 0 && (
+          <div className="field-row">
+            <span className="ante-mode-label">アンティ方式</span>
+            <div className="action-type-buttons" role="group" aria-label="アンティ方式">
+              <button
+                type="button"
+                className={`action-type-button ${anteMode === 'bb' ? 'selected' : ''}`}
+                onClick={() => setAnteMode('bb')}
+              >
+                BBのみ
+              </button>
+              <button
+                type="button"
+                className={`action-type-button ${anteMode === 'all' ? 'selected' : ''}`}
+                onClick={() => setAnteMode('all')}
+              >
+                全員
+              </button>
+            </div>
+          </div>
+        )}
       </section>
 
       <section className="form-section">
@@ -267,22 +337,65 @@ export default function HandForm({ hand, onSaved, onCancel }: HandFormProps) {
 
       <section className="form-section">
         <h3>結果</h3>
-        {hasAnyAction ? (
+        {!hasAnyAction ? (
+          <p className="result-hint">アクションを入力すると結果を判定します</p>
+        ) : (
           <div className="result-editor">
-            <span className="result-label">勝者 (チョップは複数選択)</span>
-            <div className="action-type-buttons" role="group" aria-label="勝者">
-              {survivorsAtEnd.map((p) => (
-                <button
-                  type="button"
-                  key={p.id}
-                  className={`action-type-button ${effectiveWinnerIds.includes(p.id) ? 'selected' : ''}`}
-                  onClick={() => toggleWinner(p.id)}
-                >
-                  {p.position}
-                  {p.isHero ? ' (自分)' : ''}
-                </button>
-              ))}
-            </div>
+            {survivorsAtEnd.length > 1 && !boardComplete && (
+              <p className="result-hint">ボードを5枚(フロップ・ターン・リバー)入力すると自動で勝者を判定します</p>
+            )}
+
+            {survivorsAtEnd.length > 1 && boardComplete && (
+              <>
+                <span className="result-label">ショーダウン — 相手のホールカード</span>
+                <div className="showdown-players">
+                  {survivorsAtEnd
+                    .filter((p) => !p.isHero)
+                    .map((p) => (
+                      <div key={p.id} className="showdown-player">
+                        <span className="showdown-player-label">{p.position}</span>
+                        <CardPicker
+                          count={2}
+                          value={villainCards[p.id] ?? []}
+                          onChange={(cards) => setVillainCards((prev) => ({ ...prev, [p.id]: cards }))}
+                          usedElsewhere={usedCardsForVillain(p.id)}
+                        />
+                      </div>
+                    ))}
+                </div>
+              </>
+            )}
+
+            {survivorsAtEnd.length === 1 ? (
+              <p className="result-auto">{survivorsAtEnd[0].position}の不戦勝</p>
+            ) : showdownResult ? (
+              <p className="result-auto">
+                自動判定: {showdownResult.winnerIds.map(positionOf).join('・')}の勝ち ({showdownResult.label})
+              </p>
+            ) : (
+              <>
+                <p className="result-hint">
+                  {boardComplete
+                    ? '相手のホールカードが分からない場合は、下から手動で勝者を選んでください。'
+                    : 'まだ勝者が分からない場合は、ボードとホールカードを入力すると自動判定します。フォールドで決着済みなら下から手動で選べます。'}
+                </p>
+                <span className="result-label">勝者を手動で選択 (チョップは複数選択)</span>
+                <div className="action-type-buttons" role="group" aria-label="勝者">
+                  {survivorsAtEnd.map((p) => (
+                    <button
+                      type="button"
+                      key={p.id}
+                      className={`action-type-button ${manualWinnerIds.includes(p.id) ? 'selected' : ''}`}
+                      onClick={() => toggleWinner(p.id)}
+                    >
+                      {p.position}
+                      {p.isHero ? ' (自分)' : ''}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+
             {effectiveWinnerIds.length > 0 || heroFolded ? (
               <p className={`result-net ${netAmount > 0 ? 'positive' : netAmount < 0 ? 'negative' : ''}`}>
                 収支: {netAmount >= 0 ? '+' : ''}
@@ -291,11 +404,9 @@ export default function HandForm({ hand, onSaved, onCancel }: HandFormProps) {
                 {formatBB(netAmount, bb)})
               </p>
             ) : (
-              <p className="result-hint">勝者を選ぶと収支を自動計算します</p>
+              <p className="result-hint">勝者が決まると収支を自動計算します</p>
             )}
           </div>
-        ) : (
-          <p className="result-hint">アクションを入力すると勝者を選択できます</p>
         )}
       </section>
 

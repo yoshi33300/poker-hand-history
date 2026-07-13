@@ -16,10 +16,17 @@ export interface StreetContribution {
   total: number
 }
 
-// Ante is posted entirely by the BB (the "big blind ante" format), not by every player.
+// Default format is "big blind ante" (BB posts everyone's ante); anteMode 'all'
+// switches to the traditional format where every player antes individually.
 export function blindBaseline(player: Player, stakes: Hand['stakes']): number {
+  const ante = stakes.ante ?? 0
+  if (stakes.anteMode === 'all' && ante > 0) {
+    if (player.position === 'SB') return stakes.sb + ante
+    if (player.position === 'BB') return stakes.bb + ante
+    return ante
+  }
   if (player.position === 'SB') return stakes.sb
-  if (player.position === 'BB') return stakes.bb + (stakes.ante ?? 0)
+  if (player.position === 'BB') return stakes.bb + ante
   return 0
 }
 
@@ -43,6 +50,42 @@ export function streetContribution(
   }
   const total = Object.values(perPlayer).reduce((a, b) => a + b, 0)
   return { perPlayer, total }
+}
+
+/**
+ * Whether the betting round for this street is closed: every live player has
+ * either folded, gone all-in, or matched the current bet since the last raise.
+ */
+export function isStreetComplete(
+  street: Street,
+  data: StreetData,
+  players: Player[],
+  stakes: Hand['stakes'],
+): boolean {
+  const folded = new Set(data.actions.filter((a) => a.type === 'fold').map((a) => a.playerId))
+  const live = players.filter((p) => !folded.has(p.id))
+  if (live.length <= 1) return true
+
+  // Once all-in, a player can't act again — they never (re)join needsToAct below.
+  const allIn = new Set(data.actions.filter((a) => a.type === 'allin').map((a) => a.playerId))
+  const canAct = live.map((p) => p.id).filter((id) => !allIn.has(id))
+  if (canAct.length === 0) return true
+
+  let currentBet = street === 'preflop' ? players.reduce((m, p) => Math.max(m, blindBaseline(p, stakes)), 0) : 0
+  const needsToAct = new Set(canAct)
+
+  for (const a of data.actions) {
+    if (a.amount !== undefined && a.amount > currentBet) {
+      // A raise reopens the action for everyone still able to act, except the raiser.
+      currentBet = a.amount
+      needsToAct.clear()
+      for (const id of canAct) needsToAct.add(id)
+      needsToAct.delete(a.playerId)
+    } else {
+      needsToAct.delete(a.playerId)
+    }
+  }
+  return needsToAct.size === 0
 }
 
 /** The amount a player must reach to call the current street's action. */
@@ -76,7 +119,13 @@ export function preflopPotType(hand: Pick<Hand, 'players' | 'stakes' | 'streets'
   for (const p of hand.players) currentMax = Math.max(currentMax, blindBaseline(p, hand.stakes))
   let raises = 0
   for (const action of hand.streets.preflop.actions) {
-    if (action.amount !== undefined && action.amount > currentMax) {
+    if (action.amount === undefined) continue
+    // A straddle extends the blind structure rather than being a voluntary raise.
+    if (action.type === 'post-straddle') {
+      currentMax = Math.max(currentMax, action.amount)
+      continue
+    }
+    if (action.amount > currentMax) {
       raises++
       currentMax = action.amount
     }

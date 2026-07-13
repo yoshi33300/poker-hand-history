@@ -24,6 +24,7 @@ export type ActionType =
   | 'post-sb'
   | 'post-bb'
   | 'post-ante'
+  | 'post-straddle'
   | 'fold'
   | 'check'
   | 'call'
@@ -62,10 +63,14 @@ export interface Hand {
     sb: number
     bb: number
     ante: number
+    /** Who posts the ante: 'bb' = big blind posts for the table (default), 'all' = every player antes individually. */
+    anteMode?: 'bb' | 'all'
     currency: string
   }
   players: Player[]
   heroHoleCards: CardCode[]
+  /** Opponent hole cards revealed at showdown, keyed by player id. Only present when known. */
+  villainCards?: Record<string, CardCode[]>
   streets: {
     preflop: StreetData
     flop: StreetData
@@ -86,6 +91,7 @@ export const ACTION_LABELS: Record<ActionType, string> = {
   'post-sb': 'Post SB',
   'post-bb': 'Post BB',
   'post-ante': 'Ante',
+  'post-straddle': 'Straddle',
   fold: 'Fold',
   check: 'Check',
   call: 'Call',

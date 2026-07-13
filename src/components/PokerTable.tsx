@@ -40,6 +40,7 @@ const BADGE_CLASS: Record<string, string> = {
   'post-sb': 'badge-post',
   'post-bb': 'badge-post',
   'post-ante': 'badge-post',
+  'post-straddle': 'badge-post',
 }
 
 export default function PokerTable({ hand, state, actingPlayerId, visibleIds, formatAmount }: PokerTableProps) {
@@ -111,6 +112,8 @@ export default function PokerTable({ hand, state, actingPlayerId, visibleIds, fo
                 <div className="seat-cards">
                   {p.isHero && hand.heroHoleCards.length > 0 ? (
                     hand.heroHoleCards.map((c, i) => <PlayingCard key={i} code={c} size="sm" />)
+                  ) : !p.isHero && (hand.villainCards?.[p.id]?.length ?? 0) > 0 ? (
+                    hand.villainCards![p.id].map((c, i) => <PlayingCard key={i} code={c} size="sm" />)
                   ) : (
                     <>
                       <div className="card-back" />

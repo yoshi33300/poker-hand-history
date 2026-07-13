@@ -91,6 +91,12 @@
   width: 100%;
 }
 
+.ante-mode-label {
+  align-self: center;
+  font-size: 0.85rem;
+  color: var(--text);
+}
+
 .notes-label textarea {
   resize: vertical;
 }
@@ -701,6 +707,13 @@ button.secondary:hover {
   padding: 0.6rem;
   border: 1px dashed var(--border);
   border-radius: 8px;
+}
+
+.street-complete-note {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--text);
+  opacity: 0.65;
 }
 
 .action-add-row {
@@ -1667,6 +1680,31 @@ button.secondary:hover {
   font-size: 0.85rem;
   color: var(--text);
   opacity: 0.75;
+}
+
+.result-auto {
+  margin: 0;
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--accent);
+}
+
+.showdown-players {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.showdown-player {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.showdown-player-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text);
 }
 
 /* ---- AI review ---- */

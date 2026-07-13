@@ -3,16 +3,18 @@ import { ACTION_LABELS, STREET_LABELS } from '../types'
 import type { ActionType, CardCode, Hand, HandAction, Player, Street, StreetData } from '../types'
 import { createId } from '../id'
 import { nextToAct } from '../players'
-import { currentBetTo, streetContribution } from '../pot'
+import { currentBetTo, isStreetComplete, streetContribution } from '../pot'
 import { formatBB } from '../bb'
 import CardPicker from './CardPicker'
 
-const AMOUNT_TYPES: ActionType[] = ['call', 'bet', 'raise', 'allin']
+const AMOUNT_TYPES: ActionType[] = ['call', 'bet', 'raise', 'allin', 'post-straddle']
 
 /** Which actions make sense given whether this player is facing a bet. */
-function availableActions(facingBet: boolean, canAllin: boolean): ActionType[] {
+function availableActions(street: Street, facingBet: boolean, canAllin: boolean): ActionType[] {
   const base: ActionType[] = facingBet ? ['fold', 'call', 'raise'] : ['check', 'bet']
-  return canAllin ? [...base, 'allin'] : base
+  // A straddle only makes sense preflop, as a voluntary blind raise over the current bet.
+  const withStraddle: ActionType[] = street === 'preflop' && facingBet ? [...base, 'post-straddle'] : base
+  return canAllin ? [...withStraddle, 'allin'] : withStraddle
 }
 
 interface StreetEditorProps {
@@ -55,7 +57,8 @@ export default function StreetEditor({
   const betTo = currentBetTo(contribution)
   const investedSoFar = contribution.perPlayer[playerId] ?? 0
   const remainingStack = (stackBefore[playerId] ?? 0) - investedSoFar
-  const actions = availableActions(betTo > investedSoFar, remainingStack > 0)
+  const actions = availableActions(street, betTo > investedSoFar, remainingStack > 0)
+  const bettingClosed = isStreetComplete(street, data, players, stakes)
 
   // Calling always means "match the current bet" — prefill it so nobody has
   // to do blind-adjusted mental math.
@@ -131,7 +134,11 @@ export default function StreetEditor({
         </ol>
       )}
 
-      {players.length > 0 && (
+      {players.length > 0 && bettingClosed && data.actions.length > 0 && (
+        <p className="street-complete-note">このストリートのベッティングは終了しました</p>
+      )}
+
+      {players.length > 0 && !bettingClosed && (
         <div className="action-add-form">
           <div className="action-add-row">
             <label className="action-position-label">
