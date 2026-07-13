@@ -18,15 +18,19 @@ export interface StreetContribution {
 
 // Default format is "big blind ante" (BB posts everyone's ante); anteMode 'all'
 // switches to the traditional format where every player antes individually.
+// A UTG straddle is a live bet posted blind before cards are dealt, same as SB/BB.
 export function blindBaseline(player: Player, stakes: Hand['stakes']): number {
   const ante = stakes.ante ?? 0
+  const straddle = stakes.straddle ?? 0
   if (stakes.anteMode === 'all' && ante > 0) {
     if (player.position === 'SB') return stakes.sb + ante
     if (player.position === 'BB') return stakes.bb + ante
+    if (player.position === 'UTG' && straddle > 0) return straddle + ante
     return ante
   }
   if (player.position === 'SB') return stakes.sb
   if (player.position === 'BB') return stakes.bb + ante
+  if (player.position === 'UTG' && straddle > 0) return straddle
   return 0
 }
 
@@ -119,13 +123,7 @@ export function preflopPotType(hand: Pick<Hand, 'players' | 'stakes' | 'streets'
   for (const p of hand.players) currentMax = Math.max(currentMax, blindBaseline(p, hand.stakes))
   let raises = 0
   for (const action of hand.streets.preflop.actions) {
-    if (action.amount === undefined) continue
-    // A straddle extends the blind structure rather than being a voluntary raise.
-    if (action.type === 'post-straddle') {
-      currentMax = Math.max(currentMax, action.amount)
-      continue
-    }
-    if (action.amount > currentMax) {
+    if (action.amount !== undefined && action.amount > currentMax) {
       raises++
       currentMax = action.amount
     }
@@ -168,7 +166,7 @@ export function totalContribution(
  * Players eligible to win the pot: joined the action (or posted a blind, so a
  * walk still has its winner) and never folded.
  */
-export function survivors(hand: Pick<Hand, 'players' | 'streets'>): Player[] {
+export function survivors(hand: Pick<Hand, 'players' | 'stakes' | 'streets'>): Player[] {
   const acted = new Set<string>()
   const folded = new Set<string>()
   for (const street of STREETS) {
@@ -177,8 +175,11 @@ export function survivors(hand: Pick<Hand, 'players' | 'streets'>): Player[] {
       if (a.type === 'fold') folded.add(a.playerId)
     }
   }
+  const utgStraddled = (hand.stakes.straddle ?? 0) > 0
   return hand.players.filter(
-    (p) => !folded.has(p.id) && (acted.has(p.id) || p.position === 'SB' || p.position === 'BB'),
+    (p) =>
+      !folded.has(p.id) &&
+      (acted.has(p.id) || p.position === 'SB' || p.position === 'BB' || (p.position === 'UTG' && utgStraddled)),
   )
 }
 

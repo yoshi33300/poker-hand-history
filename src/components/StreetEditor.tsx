@@ -7,14 +7,12 @@ import { currentBetTo, isStreetComplete, streetContribution } from '../pot'
 import { formatBB } from '../bb'
 import CardPicker from './CardPicker'
 
-const AMOUNT_TYPES: ActionType[] = ['call', 'bet', 'raise', 'allin', 'post-straddle']
+const AMOUNT_TYPES: ActionType[] = ['call', 'bet', 'raise', 'allin']
 
 /** Which actions make sense given whether this player is facing a bet. */
-function availableActions(street: Street, facingBet: boolean, canAllin: boolean): ActionType[] {
+function availableActions(facingBet: boolean, canAllin: boolean): ActionType[] {
   const base: ActionType[] = facingBet ? ['fold', 'call', 'raise'] : ['check', 'bet']
-  // A straddle only makes sense preflop, as a voluntary blind raise over the current bet.
-  const withStraddle: ActionType[] = street === 'preflop' && facingBet ? [...base, 'post-straddle'] : base
-  return canAllin ? [...withStraddle, 'allin'] : withStraddle
+  return canAllin ? [...base, 'allin'] : base
 }
 
 interface StreetEditorProps {
@@ -57,7 +55,7 @@ export default function StreetEditor({
   const betTo = currentBetTo(contribution)
   const investedSoFar = contribution.perPlayer[playerId] ?? 0
   const remainingStack = (stackBefore[playerId] ?? 0) - investedSoFar
-  const actions = availableActions(street, betTo > investedSoFar, remainingStack > 0)
+  const actions = availableActions(betTo > investedSoFar, remainingStack > 0)
   const bettingClosed = isStreetComplete(street, data, players, stakes)
 
   // Calling always means "match the current bet" — prefill it so nobody has

@@ -209,8 +209,8 @@ export default function HandReplayer({ hand, onBack, onEdit }: HandReplayerProps
           {hand.stakes.bb}
           {hand.stakes.ante > 0
             ? ` (アンティ ${hand.stakes.ante}${hand.stakes.anteMode === 'all' ? '・全員' : ''})`
-            : ''}{' '}
-          ・ {hand.gameType}
+            : ''}
+          {(hand.stakes.straddle ?? 0) > 0 ? ` UTGストラドル ${hand.stakes.straddle}` : ''} ・ {hand.gameType}
         </p>
         <div className="unit-toggle" role="group" aria-label="表示単位">
           <button

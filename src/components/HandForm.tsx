@@ -35,6 +35,7 @@ export default function HandForm({ hand, onSaved, onCancel }: HandFormProps) {
   const [bb, setBb] = useState(hand?.stakes.bb ?? 2)
   const [ante, setAnte] = useState(hand?.stakes.ante ?? 0)
   const [anteMode, setAnteMode] = useState<'bb' | 'all'>(hand?.stakes.anteMode ?? 'bb')
+  const [straddle, setStraddle] = useState(hand?.stakes.straddle ?? 0)
   const [currency, setCurrency] = useState(hand?.stakes.currency ?? '$')
   const [players, setPlayers] = useState<Player[]>(() => hand?.players ?? createDefaultPlayers(6, 200))
   const [heroHoleCards, setHeroHoleCards] = useState<CardCode[]>(hand?.heroHoleCards ?? [])
@@ -53,7 +54,7 @@ export default function HandForm({ hand, onSaved, onCancel }: HandFormProps) {
   const [notes, setNotes] = useState(hand?.result.notes ?? '')
   const isNarrow = useIsNarrow()
   // Which blind field the drum-roll picker is editing on mobile.
-  const [blindPicker, setBlindPicker] = useState<null | 'sb' | 'bb' | 'ante'>(null)
+  const [blindPicker, setBlindPicker] = useState<null | 'sb' | 'bb' | 'ante' | 'straddle'>(null)
 
   // BB changes always re-baseline every player's stack to 100bb.
   const prevBbRef = useRef(bb)
@@ -65,7 +66,7 @@ export default function HandForm({ hand, onSaved, onCancel }: HandFormProps) {
   }, [bb])
 
   const hero = players.find((p) => p.isHero)
-  const stakes = { sb, bb, ante, anteMode, currency }
+  const stakes = { sb, bb, ante, anteMode, straddle, currency }
   const handSnapshot = { players, stakes, streets }
 
   // Winner candidates and hero's net are derived live from the recorded actions.
@@ -108,12 +109,13 @@ export default function HandForm({ hand, onSaved, onCancel }: HandFormProps) {
 
   /**
    * Players still in the hand when this street starts, in action order.
-   * SB/BB count as "in" even with no recorded preflop action — they posted a
-   * blind, so a limped pot (e.g. BB never explicitly checks) doesn't silently
-   * drop them from the flop onward.
+   * SB/BB (and UTG when they've straddled) count as "in" even with no recorded
+   * preflop action — they posted a blind, so a limped pot (e.g. BB never
+   * explicitly checks) doesn't silently drop them from the flop onward.
    */
   function playersFor(street: Street): Player[] {
     const streetIndex = STREETS.indexOf(street)
+    const utgStraddled = (stakes.straddle ?? 0) > 0
     let list = players
     if (streetIndex > 0) {
       const acted = new Set(streets.preflop.actions.map((a) => a.playerId))
@@ -124,10 +126,15 @@ export default function HandForm({ hand, onSaved, onCancel }: HandFormProps) {
         }
       }
       list = list.filter(
-        (p) => !folded.has(p.id) && (acted.has(p.id) || p.position === 'SB' || p.position === 'BB'),
+        (p) =>
+          !folded.has(p.id) &&
+          (acted.has(p.id) ||
+            p.position === 'SB' ||
+            p.position === 'BB' ||
+            (p.position === 'UTG' && utgStraddled)),
       )
     }
-    return orderForStreet(street, list)
+    return orderForStreet(street, list, utgStraddled)
   }
 
   function stackBeforeFor(street: Street): Record<string, number> {
@@ -281,6 +288,19 @@ export default function HandForm({ hand, onSaved, onCancel }: HandFormProps) {
               onChange={(e) => setAnte(Number(e.target.value))}
             />
           </label>
+          <label>
+            ストラドル
+            <input
+              type="number"
+              min={0}
+              value={straddle}
+              readOnly={isNarrow}
+              onClick={() => {
+                if (isNarrow) setBlindPicker('straddle')
+              }}
+              onChange={(e) => setStraddle(Number(e.target.value))}
+            />
+          </label>
         </div>
         {ante > 0 && (
           <div className="field-row">
@@ -431,13 +451,16 @@ export default function HandForm({ hand, onSaved, onCancel }: HandFormProps) {
 
       {blindPicker && (
         <WheelPicker
-          title={blindPicker === 'sb' ? 'SB' : blindPicker === 'bb' ? 'BB' : 'アンティ'}
-          value={blindPicker === 'sb' ? sb : blindPicker === 'bb' ? bb : ante}
+          title={
+            blindPicker === 'sb' ? 'SB' : blindPicker === 'bb' ? 'BB' : blindPicker === 'ante' ? 'アンティ' : 'ストラドル'
+          }
+          value={blindPicker === 'sb' ? sb : blindPicker === 'bb' ? bb : blindPicker === 'ante' ? ante : straddle}
           values={BLIND_CHOICES}
           onSelect={(v) => {
             if (blindPicker === 'sb') setSb(v)
             else if (blindPicker === 'bb') setBb(v)
-            else setAnte(v)
+            else if (blindPicker === 'ante') setAnte(v)
+            else setStraddle(v)
           }}
           onClose={() => setBlindPicker(null)}
         />

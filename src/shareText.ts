@@ -15,12 +15,11 @@ const ACTION_SHORT: Record<ActionType, string> = {
   'post-sb': 'sb',
   'post-bb': 'bb',
   'post-ante': 'ante',
-  'post-straddle': 'straddle',
 }
 
 // Amounts are shown only where they carry information (bet/raise/all-in sizes);
 // a call always matches the current bet, so "c" alone reads fine.
-const AMOUNT_SHOWN: ActionType[] = ['bet', 'raise', 'allin', 'post-straddle']
+const AMOUNT_SHOWN: ActionType[] = ['bet', 'raise', 'allin']
 
 function positionOf(hand: Hand, playerId: string): string {
   return hand.players.find((p) => p.id === playerId)?.position ?? '?'
@@ -43,8 +42,9 @@ export function buildHandText(hand: Hand): string {
   const effText = Number.isFinite(eff) ? ` eff ${formatBB(eff, hand.stakes.bb)}` : ''
   const anteText =
     hand.stakes.ante > 0 ? ` (アンティ${hand.stakes.ante}${hand.stakes.anteMode === 'all' ? '・全員' : ''})` : ''
+  const straddleText = (hand.stakes.straddle ?? 0) > 0 ? ` UTGストラドル${hand.stakes.straddle}` : ''
   lines.push(
-    `${hand.stakes.currency}${hand.stakes.sb}/${hand.stakes.currency}${hand.stakes.bb}${anteText}　${hand.gameType}${effText}`,
+    `${hand.stakes.currency}${hand.stakes.sb}/${hand.stakes.currency}${hand.stakes.bb}${anteText}${straddleText}　${hand.gameType}${effText}`,
   )
   lines.push('')
 

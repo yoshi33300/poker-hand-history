@@ -40,7 +40,6 @@ const BADGE_CLASS: Record<string, string> = {
   'post-sb': 'badge-post',
   'post-bb': 'badge-post',
   'post-ante': 'badge-post',
-  'post-straddle': 'badge-post',
 }
 
 export default function PokerTable({ hand, state, actingPlayerId, visibleIds, formatAmount }: PokerTableProps) {

@@ -24,7 +24,6 @@ export type ActionType =
   | 'post-sb'
   | 'post-bb'
   | 'post-ante'
-  | 'post-straddle'
   | 'fold'
   | 'check'
   | 'call'
@@ -65,6 +64,8 @@ export interface Hand {
     ante: number
     /** Who posts the ante: 'bb' = big blind posts for the table (default), 'all' = every player antes individually. */
     anteMode?: 'bb' | 'all'
+    /** UTG straddle amount, posted blind before cards are dealt. 0/undefined = no straddle. */
+    straddle?: number
     currency: string
   }
   players: Player[]
@@ -91,7 +92,6 @@ export const ACTION_LABELS: Record<ActionType, string> = {
   'post-sb': 'Post SB',
   'post-bb': 'Post BB',
   'post-ante': 'Ante',
-  'post-straddle': 'Straddle',
   fold: 'Fold',
   check: 'Check',
   call: 'Call',

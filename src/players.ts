@@ -55,7 +55,7 @@ export function resizePlayers(players: Player[], count: number, startingStack: n
   return next
 }
 
-export function orderForStreet(street: Street, players: Player[]): Player[] {
+export function orderForStreet(street: Street, players: Player[], utgStraddled = false): Player[] {
   const order = street === 'preflop' ? PREFLOP_ORDER : POSTFLOP_ORDER
   const sorted = [...players].sort(
     (a, b) => order.indexOf(a.position) - order.indexOf(b.position),
@@ -68,6 +68,15 @@ export function orderForStreet(street: Street, players: Player[]): Player[] {
     sorted[1].position === 'BB'
   ) {
     return [sorted[1], sorted[0]]
+  }
+  // A UTG straddle is a live bet posted before cards are dealt — UTG closes the
+  // action after the blinds instead of opening it.
+  if (street === 'preflop' && utgStraddled) {
+    const utgIndex = sorted.findIndex((p) => p.position === 'UTG')
+    if (utgIndex !== -1) {
+      const [utg] = sorted.splice(utgIndex, 1)
+      sorted.push(utg)
+    }
   }
   return sorted
 }
