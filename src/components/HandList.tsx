@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { deleteHands, getAllHands, importHands, isHand } from '../db'
 import { formatBB } from '../bb'
+import { formatPosition } from '../players'
 import { totalPot } from '../pot'
 import type { Hand } from '../types'
 import PlayingCard, { InlineCard } from './PlayingCard'
@@ -194,7 +195,7 @@ export default function HandList({ refreshToken, onOpen }: HandListProps) {
                       {new Date(hand.createdAt).toLocaleString('ja-JP')} ・{' '}
                       {hand.stakes.currency}
                       {hand.stakes.sb}/{hand.stakes.currency}
-                      {hand.stakes.bb} ・ {hero?.position ?? '-'}
+                      {hand.stakes.bb} ・ {hero ? formatPosition(hero.position, hand.stakes.straddle) : '-'}
                       {hero && ` ・ ${formatBB(hero.startingStack, hand.stakes.bb)}`}
                       {` ・ ポット ${totalPot(hand)}${hand.stakes.currency}`}
                     </div>

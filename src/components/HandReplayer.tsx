@@ -4,6 +4,7 @@ import type { CardCode, Hand, HandAction, Street } from '../types'
 import { formatCard } from '../cards'
 import { formatBB } from '../bb'
 import { blindBaseline } from '../pot'
+import { formatPosition } from '../players'
 import { buildHandText } from '../shareText'
 // AIレビューを有効化する場合はこの import と下部の <AiReview hand={hand} /> を戻す
 // import AiReview from './AiReview'
@@ -165,7 +166,8 @@ export default function HandReplayer({ hand, onBack, onEdit }: HandReplayerProps
   )
 
   function positionOf(id: string) {
-    return hand.players.find((p) => p.id === id)?.position ?? '?'
+    const p = hand.players.find((p) => p.id === id)
+    return p ? formatPosition(p.position, hand.stakes.straddle) : '?'
   }
 
   function describe(e: TimelineEvent): string {

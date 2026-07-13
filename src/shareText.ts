@@ -2,6 +2,7 @@ import { STREETS, STREET_LABELS } from './types'
 import type { ActionType, Hand, HandAction } from './types'
 import { formatCard } from './cards'
 import { effectiveStack, potBeforeStreet } from './pot'
+import { formatPosition } from './players'
 import { formatBB } from './bb'
 
 // Poker shorthand: r = raise, b = bet, c = call, x = check, f = fold, ai = all-in.
@@ -22,7 +23,8 @@ const ACTION_SHORT: Record<ActionType, string> = {
 const AMOUNT_SHOWN: ActionType[] = ['bet', 'raise', 'allin']
 
 function positionOf(hand: Hand, playerId: string): string {
-  return hand.players.find((p) => p.id === playerId)?.position ?? '?'
+  const p = hand.players.find((p) => p.id === playerId)
+  return p ? formatPosition(p.position, hand.stakes.straddle) : '?'
 }
 
 function shortAction(hand: Hand, a: HandAction): string {
@@ -33,7 +35,7 @@ function shortAction(hand: Hand, a: HandAction): string {
 /** Compact, chat-friendly hand history text. */
 export function buildHandText(hand: Hand): string {
   const hero = hand.players.find((p) => p.isHero)
-  const heroPos = hero?.position ?? '?'
+  const heroPos = hero ? formatPosition(hero.position, hand.stakes.straddle) : '?'
   const holeCards = hand.heroHoleCards.map(formatCard).join('')
 
   const lines: string[] = []

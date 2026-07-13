@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { ACTION_LABELS, STREET_LABELS } from '../types'
 import type { CardCode, Hand, HandAction, Street } from '../types'
-import { orderForStreet } from '../players'
+import { formatPosition, orderForStreet } from '../players'
 import PlayingCard from './PlayingCard'
 
 export interface TableState {
@@ -122,7 +122,7 @@ export default function PokerTable({ hand, state, actingPlayerId, visibleIds, fo
                 </div>
               )}
               <div className="seat-name">
-                {p.position}
+                {formatPosition(p.position, hand.stakes.straddle)}
                 {p.isHero && <span className="hero-badge">自分</span>}
               </div>
               <div className="seat-stack">{formatAmount(p.startingStack - (state.contributed[p.id] ?? 0))}</div>

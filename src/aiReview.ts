@@ -1,11 +1,14 @@
 import type { Hand } from './types'
 import { buildHandText } from './shareText'
+import { formatPosition } from './players'
 
 /** The hand history text plus context the share format omits (stacks, result). */
 function buildReviewInput(hand: Hand): string {
   const lines = [buildHandText(hand)]
   lines.push('')
-  lines.push(`スタック: ${hand.players.map((p) => `${p.position} ${p.startingStack}`).join(' / ')}`)
+  lines.push(
+    `スタック: ${hand.players.map((p) => `${formatPosition(p.position, hand.stakes.straddle)} ${p.startingStack}`).join(' / ')}`,
+  )
   const net = hand.result.netAmount
   lines.push(`結果: ${net >= 0 ? '+' : ''}${net}${hand.stakes.currency} (HERO)`)
   return lines.join('\n')

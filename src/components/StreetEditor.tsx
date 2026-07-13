@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { ACTION_LABELS, STREET_LABELS } from '../types'
 import type { ActionType, CardCode, Hand, HandAction, Player, Street, StreetData } from '../types'
 import { createId } from '../id'
-import { nextToAct } from '../players'
+import { formatPosition, nextToAct } from '../players'
 import { currentBetTo, isStreetComplete, streetContribution } from '../pot'
 import { formatBB } from '../bb'
 import CardPicker from './CardPicker'
@@ -54,32 +54,48 @@ export default function StreetEditor({
   const contribution = streetContribution(street, data, players, stakes)
   const betTo = currentBetTo(contribution)
   const investedSoFar = contribution.perPlayer[playerId] ?? 0
-  const remainingStack = (stackBefore[playerId] ?? 0) - investedSoFar
+  const streetStartStack = stackBefore[playerId] ?? 0
+  const remainingStack = streetStartStack - investedSoFar
   const actions = availableActions(betTo > investedSoFar, remainingStack > 0)
   const bettingClosed = isStreetComplete(street, data, players, stakes)
 
-  // Calling always means "match the current bet" — prefill it so nobody has
-  // to do blind-adjusted mental math.
+  // Calling always means "match the current bet" and an all-in commits the
+  // whole stack — prefill both so nobody has to do the mental math.
   useEffect(() => {
     if (actionType === 'call') setAmount(String(betTo))
-  }, [actionType, betTo, playerId])
+    if (actionType === 'allin') setAmount(String(streetStartStack))
+  }, [actionType, betTo, playerId, streetStartStack])
 
   // Keep the selected action valid as the situation (player, betTo) changes.
   useEffect(() => {
     if (!actions.includes(actionType)) setActionType(actions[0])
   }, [actions, actionType])
 
+  // A zero-amount raise would look like "no bet" to everyone after it, so
+  // amounts are required: a raise must exceed the current bet, the rest just
+  // need actual chips in.
+  const amountNumber = Number(amount)
+  const amountValid = !AMOUNT_TYPES.includes(actionType)
+    ? true
+    : actionType === 'raise'
+      ? amountNumber > betTo
+      : amountNumber > 0
+
   function addAction() {
-    if (!playerId) return
+    if (!playerId || !amountValid) return
     const action: HandAction = {
       id: createId(),
       playerId,
       type: actionType,
-      amount: AMOUNT_TYPES.includes(actionType) ? Number(amount) || 0 : undefined,
+      amount: AMOUNT_TYPES.includes(actionType) ? amountNumber : undefined,
     }
     onChange({ ...data, actions: [...data.actions, action] })
     setAmount('')
     setManualId(null)
+    // After an aggressive action the next player most often calls — preselect it.
+    if (actionType === 'bet' || actionType === 'raise' || actionType === 'allin') {
+      setActionType('call')
+    }
   }
 
   function removeAction(id: string) {
@@ -87,7 +103,8 @@ export default function StreetEditor({
   }
 
   function positionOf(id: string) {
-    return players.find((p) => p.id === id)?.position ?? '?'
+    const p = players.find((p) => p.id === id)
+    return p ? formatPosition(p.position, stakes.straddle) : '?'
   }
 
   return (
@@ -144,7 +161,7 @@ export default function StreetEditor({
               <select value={playerId} onChange={(e) => setManualId(e.target.value)}>
                 {players.map((p) => (
                   <option key={p.id} value={p.id}>
-                    {p.position}
+                    {formatPosition(p.position, stakes.straddle)}
                     {p.isHero ? ' (自分)' : ''}
                   </option>
                 ))}
@@ -176,7 +193,7 @@ export default function StreetEditor({
                 />
               </label>
             )}
-            <button type="button" className="action-add-button" onClick={addAction}>
+            <button type="button" className="action-add-button" onClick={addAction} disabled={!amountValid}>
               アクションを追加
             </button>
           </div>

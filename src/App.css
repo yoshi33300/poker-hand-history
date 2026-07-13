@@ -91,12 +91,6 @@
   width: 100%;
 }
 
-.ante-mode-label {
-  align-self: center;
-  font-size: 0.85rem;
-  color: var(--text);
-}
-
 .notes-label textarea {
   resize: vertical;
 }
@@ -795,6 +789,11 @@ button.secondary:hover {
   font-weight: 600;
 }
 
+.action-add-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .board-preview {
   display: flex;
   gap: 0.4rem;
@@ -823,34 +822,38 @@ button.secondary:hover {
   color: var(--text);
 }
 
-.icon-button {
+/* button.icon-button so the icon keeps its square shape even against
+   context rules like `.hand-list-toolbar button` (same specificity, later wins). */
+button.icon-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2.1rem;
-  height: 2.1rem;
+  width: 2.3rem;
+  height: 2.3rem;
   padding: 0;
+  font-size: 1rem;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: none;
   color: var(--text);
 }
 
-.icon-button:hover:not(:disabled) {
+button.icon-button:hover:not(:disabled) {
   border-color: var(--text);
 }
 
-.icon-button:disabled {
+button.icon-button:disabled {
   opacity: 0.4;
 }
 
-.icon-button.danger {
-  color: var(--danger);
+button.icon-button.danger {
+  background: var(--danger);
   border-color: var(--danger);
+  color: #fff;
 }
 
-.icon-button.danger:hover:not(:disabled) {
-  background: var(--danger-soft, rgba(220, 60, 60, 0.12));
+button.icon-button.danger:hover:not(:disabled) {
+  filter: brightness(1.15);
 }
 
 .hand-list-status {

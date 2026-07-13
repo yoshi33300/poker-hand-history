@@ -20,6 +20,11 @@ export function positionsFor(count: number): Position[] {
   return POSITION_SETS[Math.min(9, Math.max(2, count))]
 }
 
+/** Position label for display — flags the straddler so it isn't mistaken for a plain UTG open. */
+export function formatPosition(position: Position, straddle?: number): string {
+  return position === 'UTG' && (straddle ?? 0) > 0 ? 'UTG(STR)' : position
+}
+
 function defaultHeroPosition(positions: Position[]): Position {
   return positions.includes('BTN') ? 'BTN' : positions[0]
 }

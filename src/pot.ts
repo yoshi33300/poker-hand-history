@@ -163,8 +163,22 @@ export function totalContribution(
 }
 
 /**
- * Players eligible to win the pot: joined the action (or posted a blind, so a
- * walk still has its winner) and never folded.
+ * A player with no recorded preflop action is still in the hand only while
+ * nobody has bet past what they already posted blind (BB in a limped pot, the
+ * straddler when everyone just called) — once someone raises above their post,
+ * silence means they folded.
+ */
+export function impliedInHand(hand: Pick<Hand, 'players' | 'stakes' | 'streets'>, player: Player): boolean {
+  const preflopBet = currentBetTo(
+    streetContribution('preflop', hand.streets.preflop, hand.players, hand.stakes),
+  )
+  const posted = blindBaseline(player, hand.stakes)
+  return posted > 0 && posted >= preflopBet
+}
+
+/**
+ * Players eligible to win the pot: joined the action (or posted enough blind
+ * that no action was required, so a walk still has its winner) and never folded.
  */
 export function survivors(hand: Pick<Hand, 'players' | 'stakes' | 'streets'>): Player[] {
   const acted = new Set<string>()
@@ -175,11 +189,8 @@ export function survivors(hand: Pick<Hand, 'players' | 'stakes' | 'streets'>): P
       if (a.type === 'fold') folded.add(a.playerId)
     }
   }
-  const utgStraddled = (hand.stakes.straddle ?? 0) > 0
   return hand.players.filter(
-    (p) =>
-      !folded.has(p.id) &&
-      (acted.has(p.id) || p.position === 'SB' || p.position === 'BB' || (p.position === 'UTG' && utgStraddled)),
+    (p) => !folded.has(p.id) && (acted.has(p.id) || impliedInHand(hand, p)),
   )
 }
 

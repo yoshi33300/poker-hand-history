@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { resizePlayers } from '../players'
+import { formatPosition, resizePlayers } from '../players'
 import { formatBB } from '../bb'
 import { useIsNarrow } from '../useIsNarrow'
 import type { Player } from '../types'
@@ -10,9 +10,10 @@ interface PositionsEditorProps {
   onChange: (players: Player[]) => void
   defaultStack: number
   bb: number
+  straddle?: number
 }
 
-export default function PositionsEditor({ players, onChange, defaultStack, bb }: PositionsEditorProps) {
+export default function PositionsEditor({ players, onChange, defaultStack, bb, straddle }: PositionsEditorProps) {
   const isNarrow = useIsNarrow()
   // Which stack the drum-roll picker is editing: every seat at once, or one player.
   const [picker, setPicker] = useState<{ kind: 'all' } | { kind: 'one'; id: string } | null>(null)
@@ -92,7 +93,7 @@ export default function PositionsEditor({ players, onChange, defaultStack, bb }:
               onChange={() => setHero(p.id)}
               aria-label={`${p.position}を自分にする`}
             />
-            <span className="position-name">{p.position}</span>
+            <span className="position-name">{formatPosition(p.position, straddle)}</span>
             {p.isHero && <span className="hero-badge">自分</span>}
             <input
               className="position-stack"
@@ -127,7 +128,7 @@ export default function PositionsEditor({ players, onChange, defaultStack, bb }:
       )}
       {pickerTarget && (
         <WheelPicker
-          title={`${pickerTarget.position}のスタック`}
+          title={`${formatPosition(pickerTarget.position, straddle)}のスタック`}
           value={pickerTarget.startingStack}
           min={0}
           max={pickerMax}

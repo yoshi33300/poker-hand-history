@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { createId } from '../id'
-import { createDefaultPlayers, orderForStreet } from '../players'
+import { createDefaultPlayers, formatPosition, orderForStreet } from '../players'
 import { saveHand } from '../db'
-import { heroNetAmount, potBeforeStreet, preflopPotType, stackBeforeStreet, survivors } from '../pot'
+import { heroNetAmount, impliedInHand, potBeforeStreet, preflopPotType, stackBeforeStreet, survivors } from '../pot'
 import { determineShowdownWinners } from '../handRank'
 import { formatBB } from '../bb'
 import { STREETS } from '../types'
@@ -34,7 +34,6 @@ export default function HandForm({ hand, onSaved, onCancel }: HandFormProps) {
   const [sb, setSb] = useState(hand?.stakes.sb ?? 1)
   const [bb, setBb] = useState(hand?.stakes.bb ?? 2)
   const [ante, setAnte] = useState(hand?.stakes.ante ?? 0)
-  const [anteMode, setAnteMode] = useState<'bb' | 'all'>(hand?.stakes.anteMode ?? 'bb')
   const [straddle, setStraddle] = useState(hand?.stakes.straddle ?? 0)
   const [currency, setCurrency] = useState(hand?.stakes.currency ?? '$')
   const [players, setPlayers] = useState<Player[]>(() => hand?.players ?? createDefaultPlayers(6, 200))
@@ -66,7 +65,8 @@ export default function HandForm({ hand, onSaved, onCancel }: HandFormProps) {
   }, [bb])
 
   const hero = players.find((p) => p.isHero)
-  const stakes = { sb, bb, ante, anteMode, straddle, currency }
+  // anteMode is passed through untouched so hands saved with the old all-ante toggle keep their pot math.
+  const stakes = { sb, bb, ante, anteMode: hand?.stakes.anteMode, straddle, currency }
   const handSnapshot = { players, stakes, streets }
 
   // Winner candidates and hero's net are derived live from the recorded actions.
@@ -104,14 +104,15 @@ export default function HandForm({ hand, onSaved, onCancel }: HandFormProps) {
   }
 
   function positionOf(id: string): string {
-    return players.find((p) => p.id === id)?.position ?? '?'
+    const p = players.find((p) => p.id === id)
+    return p ? formatPosition(p.position, straddle) : '?'
   }
 
   /**
    * Players still in the hand when this street starts, in action order.
-   * SB/BB (and UTG when they've straddled) count as "in" even with no recorded
-   * preflop action — they posted a blind, so a limped pot (e.g. BB never
-   * explicitly checks) doesn't silently drop them from the flop onward.
+   * A player with no recorded preflop action stays in only while their blind
+   * post covers the final preflop bet (BB in a limped pot, the straddler when
+   * everyone just called) — if someone raised past it, silence means a fold.
    */
   function playersFor(street: Street): Player[] {
     const streetIndex = STREETS.indexOf(street)
@@ -126,12 +127,7 @@ export default function HandForm({ hand, onSaved, onCancel }: HandFormProps) {
         }
       }
       list = list.filter(
-        (p) =>
-          !folded.has(p.id) &&
-          (acted.has(p.id) ||
-            p.position === 'SB' ||
-            p.position === 'BB' ||
-            (p.position === 'UTG' && utgStraddled)),
+        (p) => !folded.has(p.id) && (acted.has(p.id) || impliedInHand(handSnapshot, p)),
       )
     }
     return orderForStreet(street, list, utgStraddled)
@@ -302,36 +298,15 @@ export default function HandForm({ hand, onSaved, onCancel }: HandFormProps) {
             />
           </label>
         </div>
-        {ante > 0 && (
-          <div className="field-row">
-            <span className="ante-mode-label">アンティ方式</span>
-            <div className="action-type-buttons" role="group" aria-label="アンティ方式">
-              <button
-                type="button"
-                className={`action-type-button ${anteMode === 'bb' ? 'selected' : ''}`}
-                onClick={() => setAnteMode('bb')}
-              >
-                BBのみ
-              </button>
-              <button
-                type="button"
-                className={`action-type-button ${anteMode === 'all' ? 'selected' : ''}`}
-                onClick={() => setAnteMode('all')}
-              >
-                全員
-              </button>
-            </div>
-          </div>
-        )}
       </section>
 
       <section className="form-section">
         <h3>ポジション</h3>
-        <PositionsEditor players={players} onChange={setPlayers} defaultStack={bb * 100} bb={bb} />
+        <PositionsEditor players={players} onChange={setPlayers} defaultStack={bb * 100} bb={bb} straddle={straddle} />
       </section>
 
       <section className="form-section">
-        <h3>自分のホールカード {hero ? `(${hero.position})` : ''}</h3>
+        <h3>自分のホールカード {hero ? `(${formatPosition(hero.position, straddle)})` : ''}</h3>
         <CardPicker
           count={2}
           value={heroHoleCards}
@@ -361,19 +336,15 @@ export default function HandForm({ hand, onSaved, onCancel }: HandFormProps) {
           <p className="result-hint">アクションを入力すると結果を判定します</p>
         ) : (
           <div className="result-editor">
-            {survivorsAtEnd.length > 1 && !boardComplete && (
-              <p className="result-hint">ボードを5枚(フロップ・ターン・リバー)入力すると自動で勝者を判定します</p>
-            )}
-
-            {survivorsAtEnd.length > 1 && boardComplete && (
+            {survivorsAtEnd.some((p) => !p.isHero) && (
               <>
-                <span className="result-label">ショーダウン — 相手のホールカード</span>
+                <span className="result-label">相手のホールカード (わかる場合)</span>
                 <div className="showdown-players">
                   {survivorsAtEnd
                     .filter((p) => !p.isHero)
                     .map((p) => (
                       <div key={p.id} className="showdown-player">
-                        <span className="showdown-player-label">{p.position}</span>
+                        <span className="showdown-player-label">{formatPosition(p.position, straddle)}</span>
                         <CardPicker
                           count={2}
                           value={villainCards[p.id] ?? []}
@@ -386,8 +357,12 @@ export default function HandForm({ hand, onSaved, onCancel }: HandFormProps) {
               </>
             )}
 
+            {survivorsAtEnd.length > 1 && !boardComplete && (
+              <p className="result-hint">ボードを5枚(フロップ・ターン・リバー)入力すると自動で勝者を判定します</p>
+            )}
+
             {survivorsAtEnd.length === 1 ? (
-              <p className="result-auto">{survivorsAtEnd[0].position}の不戦勝</p>
+              <p className="result-auto">{formatPosition(survivorsAtEnd[0].position, straddle)}の不戦勝</p>
             ) : showdownResult ? (
               <p className="result-auto">
                 自動判定: {showdownResult.winnerIds.map(positionOf).join('・')}の勝ち ({showdownResult.label})
@@ -408,7 +383,7 @@ export default function HandForm({ hand, onSaved, onCancel }: HandFormProps) {
                       className={`action-type-button ${manualWinnerIds.includes(p.id) ? 'selected' : ''}`}
                       onClick={() => toggleWinner(p.id)}
                     >
-                      {p.position}
+                      {formatPosition(p.position, straddle)}
                       {p.isHero ? ' (自分)' : ''}
                     </button>
                   ))}
