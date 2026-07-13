@@ -196,10 +196,10 @@ export default function HandForm({ hand, onSaved, onCancel }: HandFormProps) {
   }
 
   async function handleSave() {
-    // Drop showdown cards for anyone who's no longer a candidate (e.g. folded after being entered).
+    // Keep every fully-entered opponent hand (folded players may still have shown their cards).
     const savedVillainCards: Record<string, CardCode[]> = {}
-    for (const p of survivorsAtEnd) {
-      if (!p.isHero && holeCardsOf(p).length === 2) savedVillainCards[p.id] = holeCardsOf(p)
+    for (const p of players) {
+      if (!p.isHero && (villainCards[p.id]?.length ?? 0) === 2) savedVillainCards[p.id] = villainCards[p.id]
     }
     const savedHand: Hand = {
       id: hand?.id ?? createId(),
@@ -306,13 +306,33 @@ export default function HandForm({ hand, onSaved, onCancel }: HandFormProps) {
       </section>
 
       <section className="form-section">
-        <h3>自分のホールカード {hero ? `(${formatPosition(hero.position, straddle)})` : ''}</h3>
-        <CardPicker
-          count={2}
-          value={heroHoleCards}
-          onChange={setHeroHoleCards}
-          usedElsewhere={usedCardsFor('hole')}
-        />
+        <h3>ホールカード</h3>
+        <div className="showdown-players">
+          <div className="showdown-player">
+            <span className="showdown-player-label">
+              {hero ? `${formatPosition(hero.position, straddle)} (自分)` : '自分'}
+            </span>
+            <CardPicker
+              count={2}
+              value={heroHoleCards}
+              onChange={setHeroHoleCards}
+              usedElsewhere={usedCardsFor('hole')}
+            />
+          </div>
+          {players
+            .filter((p) => !p.isHero)
+            .map((p) => (
+              <div key={p.id} className="showdown-player">
+                <span className="showdown-player-label">{formatPosition(p.position, straddle)}</span>
+                <CardPicker
+                  count={2}
+                  value={villainCards[p.id] ?? []}
+                  onChange={(cards) => setVillainCards((prev) => ({ ...prev, [p.id]: cards }))}
+                  usedElsewhere={usedCardsForVillain(p.id)}
+                />
+              </div>
+            ))}
+        </div>
       </section>
 
       {STREETS.map((street) => (
@@ -336,27 +356,6 @@ export default function HandForm({ hand, onSaved, onCancel }: HandFormProps) {
           <p className="result-hint">アクションを入力すると結果を判定します</p>
         ) : (
           <div className="result-editor">
-            {survivorsAtEnd.some((p) => !p.isHero) && (
-              <>
-                <span className="result-label">相手のホールカード (わかる場合)</span>
-                <div className="showdown-players">
-                  {survivorsAtEnd
-                    .filter((p) => !p.isHero)
-                    .map((p) => (
-                      <div key={p.id} className="showdown-player">
-                        <span className="showdown-player-label">{formatPosition(p.position, straddle)}</span>
-                        <CardPicker
-                          count={2}
-                          value={villainCards[p.id] ?? []}
-                          onChange={(cards) => setVillainCards((prev) => ({ ...prev, [p.id]: cards }))}
-                          usedElsewhere={usedCardsForVillain(p.id)}
-                        />
-                      </div>
-                    ))}
-                </div>
-              </>
-            )}
-
             {survivorsAtEnd.length > 1 && !boardComplete && (
               <p className="result-hint">ボードを5枚(フロップ・ターン・リバー)入力すると自動で勝者を判定します</p>
             )}

@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
-import { deleteHands, getAllHands, importHands, isHand } from '../db'
+import { useEffect, useState } from 'react'
+import { deleteHands, getAllHands } from '../db'
 import { formatBB } from '../bb'
 import { formatPosition } from '../players'
 import { totalPot } from '../pot'
@@ -15,10 +15,8 @@ interface HandListProps {
 export default function HandList({ refreshToken, onOpen }: HandListProps) {
   const [hands, setHands] = useState<Hand[]>([])
   const [loading, setLoading] = useState(true)
-  const [status, setStatus] = useState<string | null>(null)
   const [selectionMode, setSelectionMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
-  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -35,7 +33,6 @@ export default function HandList({ refreshToken, onOpen }: HandListProps) {
   }, [refreshToken])
 
   function enterSelectionMode() {
-    setStatus(null)
     setSelectionMode(true)
     setSelectedIds(new Set())
   }
@@ -69,50 +66,6 @@ export default function HandList({ refreshToken, onOpen }: HandListProps) {
     exitSelectionMode()
   }
 
-  function handleExport() {
-    const date = new Date().toISOString().slice(0, 10)
-    const blob = new Blob([JSON.stringify(hands, null, 2)], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `poker-hand-history-${date}.json`
-    a.click()
-    URL.revokeObjectURL(url)
-  }
-
-  function handleImportClick() {
-    setStatus(null)
-    fileInputRef.current?.click()
-  }
-
-  async function handleImportFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    e.target.value = ''
-    if (!file) return
-    let parsed: unknown
-    try {
-      parsed = JSON.parse(await file.text())
-    } catch {
-      setStatus('ファイルの読み込みに失敗しました。JSON形式のバックアップファイルを選んでください。')
-      return
-    }
-    const candidates = Array.isArray(parsed) ? parsed : [parsed]
-    const valid = candidates.filter(isHand)
-    if (valid.length === 0) {
-      setStatus('有効なハンドが見つかりませんでした。')
-      return
-    }
-    const skipped = candidates.length - valid.length
-    const confirmMessage =
-      `${valid.length}件のハンドを読み込みます。同じIDのハンドは上書きされます。続けますか？` +
-      (skipped > 0 ? `\n(${skipped}件は形式が不正なためスキップされます)` : '')
-    if (!window.confirm(confirmMessage)) return
-    await importHands(valid)
-    const refreshed = await getAllHands()
-    setHands(refreshed)
-    setStatus(`${valid.length}件のハンドを読み込みました。`)
-  }
-
   return (
     <div className="hand-list-page">
       <div className="hand-list-toolbar">
@@ -137,21 +90,11 @@ export default function HandList({ refreshToken, onOpen }: HandListProps) {
             </button>
           </>
         ) : (
-          <>
-            <button type="button" className="secondary" onClick={handleExport} disabled={hands.length === 0}>
-              エクスポート
-            </button>
-            <button type="button" className="secondary" onClick={handleImportClick}>
-              インポート
-            </button>
-            <button type="button" className="secondary" onClick={enterSelectionMode} disabled={hands.length === 0}>
-              選択
-            </button>
-          </>
+          <button type="button" className="secondary" onClick={enterSelectionMode} disabled={hands.length === 0}>
+            選択
+          </button>
         )}
-        <input ref={fileInputRef} type="file" accept="application/json" hidden onChange={handleImportFile} />
       </div>
-      {status && <p className="hand-list-status">{status}</p>}
       {loading ? (
         <p className="hand-list-empty">読み込み中...</p>
       ) : hands.length === 0 ? (

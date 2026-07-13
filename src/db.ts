@@ -84,33 +84,3 @@ export async function deleteHands(ids: string[]): Promise<void> {
   })
 }
 
-/** Loose structural check for imported JSON — enough to keep garbage out, not a full schema validation. */
-export function isHand(value: unknown): value is Hand {
-  if (!value || typeof value !== 'object') return false
-  const h = value as Record<string, unknown>
-  return (
-    typeof h.id === 'string' &&
-    typeof h.createdAt === 'number' &&
-    typeof h.title === 'string' &&
-    typeof h.stakes === 'object' &&
-    h.stakes !== null &&
-    Array.isArray(h.players) &&
-    Array.isArray(h.heroHoleCards) &&
-    typeof h.streets === 'object' &&
-    h.streets !== null &&
-    typeof h.result === 'object' &&
-    h.result !== null
-  )
-}
-
-/** Bulk-writes hands from a backup file. Hands sharing an id with an existing one overwrite it. */
-export async function importHands(hands: Hand[]): Promise<void> {
-  const db = await openDatabase()
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readwrite')
-    const store = tx.objectStore(STORE_NAME)
-    for (const hand of hands) store.put(migrateHand(hand))
-    tx.oncomplete = () => resolve()
-    tx.onerror = () => reject(tx.error)
-  })
-}
