@@ -117,19 +117,27 @@ export default function HandForm({ hand, onSaved, onCancel }: HandFormProps) {
   function playersFor(street: Street): Player[] {
     const streetIndex = STREETS.indexOf(street)
     const utgStraddled = (stakes.straddle ?? 0) > 0
-    let list = players
-    if (streetIndex > 0) {
+    if (streetIndex === 0) {
+      // Preflop: hide players who implicitly folded — no recorded action while
+      // someone later in the order already acted (e.g. UTG〜CO after a BTN open).
+      const ordered = orderForStreet('preflop', players, utgStraddled)
       const acted = new Set(streets.preflop.actions.map((a) => a.playerId))
-      const folded = new Set<string>()
-      for (let i = 0; i < streetIndex; i++) {
-        for (const a of streets[STREETS[i]].actions) {
-          if (a.type === 'fold') folded.add(a.playerId)
-        }
-      }
-      list = list.filter(
-        (p) => !folded.has(p.id) && (acted.has(p.id) || impliedInHand(handSnapshot, p)),
-      )
+      let lastActedIdx = -1
+      ordered.forEach((p, i) => {
+        if (acted.has(p.id)) lastActedIdx = i
+      })
+      return ordered.filter((p, i) => acted.has(p.id) || i > lastActedIdx)
     }
+    const acted = new Set(streets.preflop.actions.map((a) => a.playerId))
+    const folded = new Set<string>()
+    for (let i = 0; i < streetIndex; i++) {
+      for (const a of streets[STREETS[i]].actions) {
+        if (a.type === 'fold') folded.add(a.playerId)
+      }
+    }
+    const list = players.filter(
+      (p) => !folded.has(p.id) && (acted.has(p.id) || impliedInHand(handSnapshot, p)),
+    )
     return orderForStreet(street, list, utgStraddled)
   }
 
@@ -342,6 +350,7 @@ export default function HandForm({ hand, onSaved, onCancel }: HandFormProps) {
             data={streets[street]}
             onChange={(data) => updateStreet(street, data)}
             players={playersFor(street)}
+            allPlayers={players}
             usedCardsElsewhere={usedCardsFor(street)}
             potBefore={potBeforeStreet(handSnapshot, street)}
             stakes={stakes}
@@ -361,7 +370,7 @@ export default function HandForm({ hand, onSaved, onCancel }: HandFormProps) {
             )}
 
             {survivorsAtEnd.length === 1 ? (
-              <p className="result-auto">{formatPosition(survivorsAtEnd[0].position, straddle)}の不戦勝</p>
+              <p className="result-auto">{formatPosition(survivorsAtEnd[0].position, straddle)}の勝利</p>
             ) : showdownResult ? (
               <p className="result-auto">
                 自動判定: {showdownResult.winnerIds.map(positionOf).join('・')}の勝ち ({showdownResult.label})

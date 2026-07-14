@@ -21,6 +21,8 @@ interface StreetEditorProps {
   onChange: (data: StreetData) => void
   /** Live players for this street, sorted in action order. */
   players: Player[]
+  /** Every seat at the table — pot math needs the blinds of implicitly folded players too. */
+  allPlayers: Player[]
   usedCardsElsewhere: CardCode[]
   /** Pot size carried into this street (blinds + earlier streets). */
   potBefore: number
@@ -34,6 +36,7 @@ export default function StreetEditor({
   data,
   onChange,
   players,
+  allPlayers,
   usedCardsElsewhere,
   potBefore,
   stakes,
@@ -51,7 +54,7 @@ export default function StreetEditor({
       : nextToAct(players, data.actions)
 
   const boardCount = street === 'flop' ? 3 : street === 'preflop' ? 0 : 1
-  const contribution = streetContribution(street, data, players, stakes)
+  const contribution = streetContribution(street, data, allPlayers, stakes)
   const betTo = currentBetTo(contribution)
   const investedSoFar = contribution.perPlayer[playerId] ?? 0
   const streetStartStack = stackBefore[playerId] ?? 0
@@ -147,10 +150,6 @@ export default function StreetEditor({
             </li>
           ))}
         </ol>
-      )}
-
-      {players.length > 0 && bettingClosed && data.actions.length > 0 && (
-        <p className="street-complete-note">このストリートのベッティングは終了しました</p>
       )}
 
       {players.length > 0 && !bettingClosed && (

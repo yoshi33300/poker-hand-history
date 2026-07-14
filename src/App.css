@@ -703,13 +703,6 @@ button.secondary:hover {
   border-radius: 8px;
 }
 
-.street-complete-note {
-  margin: 0;
-  font-size: 0.8rem;
-  color: var(--text);
-  opacity: 0.65;
-}
-
 .action-add-row {
   display: flex;
   flex-wrap: wrap;
