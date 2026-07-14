@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { RANKS, SUITS, makeCard } from '../cards'
+import { useIsNarrow } from '../useIsNarrow'
 import type { CardCode } from '../types'
 import PlayingCard from './PlayingCard'
 import SuitIcon from './SuitIcon'
@@ -13,6 +14,7 @@ interface CardPickerProps {
 
 export default function CardPicker({ count, value, onChange, usedElsewhere }: CardPickerProps) {
   const [openSlot, setOpenSlot] = useState<number | null>(null)
+  const isNarrow = useIsNarrow()
 
   const slots = Array.from({ length: count }, (_, i) => value[i])
   const usedSet = new Set([...usedElsewhere, ...value])
@@ -30,6 +32,37 @@ export default function CardPicker({ count, value, onChange, usedElsewhere }: Ca
     setOpenSlot(null)
   }
 
+  const gridContent = openSlot !== null && (
+    <>
+      {SUITS.map((s) => (
+        <div className="card-grid-row" key={s.code}>
+          <span className={`card-grid-suit-label ${s.color}`} title={s.label}>
+            <SuitIcon suit={s.code} />
+          </span>
+          {RANKS.map((r) => {
+            const code = makeCard(r, s.code)
+            const disabled = usedSet.has(code) && value[openSlot] !== code
+            return (
+              <button
+                type="button"
+                key={code}
+                disabled={disabled}
+                className={`card-grid-cell ${s.color}`}
+                onClick={() => selectCard(openSlot, code)}
+              >
+                {r}
+                <SuitIcon suit={s.code} />
+              </button>
+            )
+          })}
+        </div>
+      ))}
+      <button type="button" className="card-grid-clear" onClick={() => clearSlot(openSlot!)}>
+        クリア
+      </button>
+    </>
+  )
+
   return (
     <div className="card-picker">
       <div className="card-picker-slots">
@@ -44,34 +77,18 @@ export default function CardPicker({ count, value, onChange, usedElsewhere }: Ca
           </button>
         ))}
       </div>
-      {openSlot !== null && (
-        <div className="card-grid">
-          {SUITS.map((s) => (
-            <div className="card-grid-row" key={s.code}>
-              <span className={`card-grid-suit-label ${s.color}`} title={s.label}>
-                <SuitIcon suit={s.code} />
-              </span>
-              {RANKS.map((r) => {
-                const code = makeCard(r, s.code)
-                const disabled = usedSet.has(code) && value[openSlot] !== code
-                return (
-                  <button
-                    type="button"
-                    key={code}
-                    disabled={disabled}
-                    className={`card-grid-cell ${s.color}`}
-                    onClick={() => selectCard(openSlot, code)}
-                  >
-                    {r}
-                    <SuitIcon suit={s.code} />
-                  </button>
-                )
-              })}
+      {openSlot !== null && !isNarrow && <div className="card-grid">{gridContent}</div>}
+      {openSlot !== null && isNarrow && (
+        <div className="wheel-overlay" onClick={() => setOpenSlot(null)}>
+          <div className="wheel-sheet" onClick={(e) => e.stopPropagation()}>
+            <div className="wheel-header">
+              <span className="wheel-title">カードを選択</span>
+              <button type="button" className="wheel-done" onClick={() => setOpenSlot(null)}>
+                閉じる
+              </button>
             </div>
-          ))}
-          <button type="button" className="card-grid-clear" onClick={() => clearSlot(openSlot)}>
-            クリア
-          </button>
+            <div className="card-sheet-body">{gridContent}</div>
+          </div>
         </div>
       )}
     </div>

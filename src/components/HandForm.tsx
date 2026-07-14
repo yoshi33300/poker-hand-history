@@ -2,7 +2,14 @@ import { useEffect, useRef, useState } from 'react'
 import { createId } from '../id'
 import { createDefaultPlayers, formatPosition, orderForStreet } from '../players'
 import { saveHand } from '../db'
-import { heroNetAmount, impliedInHand, potBeforeStreet, preflopPotType, stackBeforeStreet, survivors } from '../pot'
+import {
+  blindCoveredFinalBet,
+  heroNetAmount,
+  potBeforeStreet,
+  preflopPotType,
+  stackBeforeStreet,
+  survivors,
+} from '../pot'
 import { determineShowdownWinners } from '../handRank'
 import { formatBB } from '../bb'
 import { STREETS } from '../types'
@@ -110,9 +117,6 @@ export default function HandForm({ hand, onSaved, onCancel }: HandFormProps) {
 
   /**
    * Players still in the hand when this street starts, in action order.
-   * A player with no recorded preflop action stays in only while their blind
-   * post covers the final preflop bet (BB in a limped pot, the straddler when
-   * everyone just called) — if someone raised past it, silence means a fold.
    */
   function playersFor(street: Street): Player[] {
     const streetIndex = STREETS.indexOf(street)
@@ -128,6 +132,10 @@ export default function HandForm({ hand, onSaved, onCancel }: HandFormProps) {
       })
       return ordered.filter((p, i) => acted.has(p.id) || i > lastActedIdx)
     }
+    // Postflop: preflop is settled by now, so a player with no recorded
+    // preflop action only carries over if their blind post outright covered
+    // the final preflop bet (a limped BB, a straddler everyone just called) —
+    // otherwise their silence means they folded.
     const acted = new Set(streets.preflop.actions.map((a) => a.playerId))
     const folded = new Set<string>()
     for (let i = 0; i < streetIndex; i++) {
@@ -136,7 +144,7 @@ export default function HandForm({ hand, onSaved, onCancel }: HandFormProps) {
       }
     }
     const list = players.filter(
-      (p) => !folded.has(p.id) && (acted.has(p.id) || impliedInHand(handSnapshot, p)),
+      (p) => !folded.has(p.id) && (acted.has(p.id) || blindCoveredFinalBet(handSnapshot, p)),
     )
     return orderForStreet(street, list, utgStraddled)
   }

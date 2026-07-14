@@ -190,6 +190,23 @@ export function impliedInHand(hand: Pick<Hand, 'players' | 'stakes' | 'streets'>
 }
 
 /**
+ * Whether a player with no recorded preflop action can still be assumed "in"
+ * once a later street has started — at that point preflop is settled, so
+ * unlike impliedInHand there's no turn-order leniency: their blind post must
+ * outright cover the final preflop bet, or their silence means they folded.
+ */
+export function blindCoveredFinalBet(
+  hand: Pick<Hand, 'players' | 'stakes' | 'streets'>,
+  player: Player,
+): boolean {
+  const preflopBet = currentBetTo(
+    streetContribution('preflop', hand.streets.preflop, hand.players, hand.stakes),
+  )
+  const posted = blindBaseline(player, hand.stakes)
+  return posted > 0 && posted >= preflopBet
+}
+
+/**
  * Players eligible to win the pot: joined the action (or posted enough blind
  * that no action was required, so a walk still has its winner) and never folded.
  */
