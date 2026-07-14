@@ -1,5 +1,6 @@
 import { STREETS } from './types'
 import type { Hand, Player, Street, StreetData } from './types'
+import { orderForStreet } from './players'
 
 /**
  * Betting model: an action's `amount` is the TOTAL a player has committed on
@@ -163,17 +164,29 @@ export function totalContribution(
 }
 
 /**
- * A player with no recorded preflop action is still in the hand only while
- * nobody has bet past what they already posted blind (BB in a limped pot, the
- * straddler when everyone just called) — once someone raises above their post,
- * silence means they folded.
+ * A player with no recorded preflop action is still in the hand while their
+ * blind post covers the current bet (BB in a limped pot, the straddler when
+ * everyone just called). If it doesn't cover the bet, silence only means a
+ * fold once their turn has actually passed — a blind who simply hasn't acted
+ * yet (e.g. right after a same-round open) is still very much in the hand.
  */
 export function impliedInHand(hand: Pick<Hand, 'players' | 'stakes' | 'streets'>, player: Player): boolean {
   const preflopBet = currentBetTo(
     streetContribution('preflop', hand.streets.preflop, hand.players, hand.stakes),
   )
   const posted = blindBaseline(player, hand.stakes)
-  return posted > 0 && posted >= preflopBet
+  if (posted <= 0) return false
+  if (posted >= preflopBet) return true
+
+  const utgStraddled = (hand.stakes.straddle ?? 0) > 0
+  const ordered = orderForStreet('preflop', hand.players, utgStraddled)
+  const acted = new Set(hand.streets.preflop.actions.map((a) => a.playerId))
+  let lastActedIdx = -1
+  ordered.forEach((p, i) => {
+    if (acted.has(p.id)) lastActedIdx = i
+  })
+  const playerIdx = ordered.findIndex((p) => p.id === player.id)
+  return playerIdx > lastActedIdx
 }
 
 /**

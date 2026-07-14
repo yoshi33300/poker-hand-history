@@ -327,7 +327,7 @@ export default function HandForm({ hand, onSaved, onCancel }: HandFormProps) {
               usedElsewhere={usedCardsFor('hole')}
             />
           </div>
-          {players
+          {playersFor('preflop')
             .filter((p) => !p.isHero)
             .map((p) => (
               <div key={p.id} className="showdown-player">
@@ -361,14 +361,8 @@ export default function HandForm({ hand, onSaved, onCancel }: HandFormProps) {
 
       <section className="form-section">
         <h3>結果</h3>
-        {!hasAnyAction ? (
-          <p className="result-hint">アクションを入力すると結果を判定します</p>
-        ) : (
+        {hasAnyAction && (
           <div className="result-editor">
-            {survivorsAtEnd.length > 1 && !boardComplete && (
-              <p className="result-hint">ボードを5枚(フロップ・ターン・リバー)入力すると自動で勝者を判定します</p>
-            )}
-
             {survivorsAtEnd.length === 1 ? (
               <p className="result-auto">{formatPosition(survivorsAtEnd[0].position, straddle)}の勝利</p>
             ) : showdownResult ? (
@@ -376,38 +370,28 @@ export default function HandForm({ hand, onSaved, onCancel }: HandFormProps) {
                 自動判定: {showdownResult.winnerIds.map(positionOf).join('・')}の勝ち ({showdownResult.label})
               </p>
             ) : (
-              <>
-                <p className="result-hint">
-                  {boardComplete
-                    ? '相手のホールカードが分からない場合は、下から手動で勝者を選んでください。'
-                    : 'まだ勝者が分からない場合は、ボードとホールカードを入力すると自動判定します。フォールドで決着済みなら下から手動で選べます。'}
-                </p>
-                <span className="result-label">勝者を手動で選択 (チョップは複数選択)</span>
-                <div className="action-type-buttons" role="group" aria-label="勝者">
-                  {survivorsAtEnd.map((p) => (
-                    <button
-                      type="button"
-                      key={p.id}
-                      className={`action-type-button ${manualWinnerIds.includes(p.id) ? 'selected' : ''}`}
-                      onClick={() => toggleWinner(p.id)}
-                    >
-                      {formatPosition(p.position, straddle)}
-                      {p.isHero ? ' (自分)' : ''}
-                    </button>
-                  ))}
-                </div>
-              </>
+              <div className="action-type-buttons" role="group" aria-label="勝者を手動で選択">
+                {survivorsAtEnd.map((p) => (
+                  <button
+                    type="button"
+                    key={p.id}
+                    className={`action-type-button ${manualWinnerIds.includes(p.id) ? 'selected' : ''}`}
+                    onClick={() => toggleWinner(p.id)}
+                  >
+                    {formatPosition(p.position, straddle)}
+                    {p.isHero ? ' (自分)' : ''}
+                  </button>
+                ))}
+              </div>
             )}
 
-            {effectiveWinnerIds.length > 0 || heroFolded ? (
+            {(effectiveWinnerIds.length > 0 || heroFolded) && (
               <p className={`result-net ${netAmount > 0 ? 'positive' : netAmount < 0 ? 'negative' : ''}`}>
                 収支: {netAmount >= 0 ? '+' : ''}
                 {netAmount}
                 {currency} ({netAmount > 0 ? '+' : ''}
                 {formatBB(netAmount, bb)})
               </p>
-            ) : (
-              <p className="result-hint">勝者が決まると収支を自動計算します</p>
             )}
           </div>
         )}
