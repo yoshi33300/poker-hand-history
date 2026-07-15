@@ -92,8 +92,25 @@ function computeState(hand: Hand, events: TimelineEvent[], index: number): Table
   }
 }
 
+// Step-by-step navigation stops at actions only — street headers and board
+// reveals aren't worth an extra click, so they ride along with the next
+// action. A trailing stop is added when a street's board was recorded with
+// no further action (e.g. everyone ran it out after an earlier all-in), so
+// that final board still gets shown once at the end of the timeline.
+function buildStops(events: TimelineEvent[]): number[] {
+  const stops: number[] = []
+  events.forEach((e, i) => {
+    if (e.kind === 'action') stops.push(i + 1)
+  })
+  if (events.length > 0 && stops[stops.length - 1] !== events.length) {
+    stops.push(events.length)
+  }
+  return stops
+}
+
 export default function HandReplayer({ hand, onBack, onEdit }: HandReplayerProps) {
   const events = useMemo(() => buildTimeline(hand), [hand])
+  const stops = useMemo(() => buildStops(events), [events])
   const [step, setStep] = useState(0)
   const [playing, setPlaying] = useState(false)
   const [unit, setUnit] = useState<'chips' | 'bb'>('bb')
@@ -142,16 +159,19 @@ export default function HandReplayer({ hand, onBack, onEdit }: HandReplayerProps
 
   useEffect(() => {
     if (!playing) return
-    if (step >= events.length) {
+    if (step >= stops.length) {
       setPlaying(false)
       return
     }
     const t = setTimeout(() => setStep((s) => s + 1), 1300)
     return () => clearTimeout(t)
-  }, [playing, step, events.length])
+  }, [playing, step, stops.length])
 
-  const state = computeState(hand, events, step)
-  const currentEvent = step > 0 ? events[step - 1] : null
+  // The event index computeState() should apply up to — everything through
+  // the current stop, action or trailing board reveal alike.
+  const currentIndex = step > 0 ? stops[step - 1] : 0
+  const state = computeState(hand, events, currentIndex)
+  const currentEvent = currentIndex > 0 ? events[currentIndex - 1] : null
   const actingPlayerId = currentEvent?.kind === 'action' ? currentEvent.action.playerId : null
 
   const preflopActed = useMemo(
@@ -252,16 +272,16 @@ export default function HandReplayer({ hand, onBack, onEdit }: HandReplayerProps
         </button>
         <button
           type="button"
-          onClick={() => setStep((s) => Math.min(events.length, s + 1))}
-          disabled={step >= events.length}
+          onClick={() => setStep((s) => Math.min(stops.length, s + 1))}
+          disabled={step >= stops.length}
         >
           進む ▶
         </button>
-        <button type="button" onClick={() => setStep(events.length)} disabled={step >= events.length}>
+        <button type="button" onClick={() => setStep(stops.length)} disabled={step >= stops.length}>
           最後 ⏭
         </button>
         <span className="replay-step-counter">
-          {step} / {events.length}
+          {step} / {stops.length}
         </span>
       </div>
 
@@ -272,8 +292,8 @@ export default function HandReplayer({ hand, onBack, onEdit }: HandReplayerProps
             className={[
               'replay-log-line',
               e.kind === 'street-start' ? 'street-line' : '',
-              i === step - 1 ? 'active' : '',
-              i >= step ? 'future' : '',
+              i === currentIndex - 1 ? 'active' : '',
+              i >= currentIndex ? 'future' : '',
             ].join(' ')}
           >
             <span className="replay-log-text">{describe(e)}</span>
@@ -288,7 +308,7 @@ export default function HandReplayer({ hand, onBack, onEdit }: HandReplayerProps
         <div className="replay-result-row">
           <span>勝者: {hand.result.winnerIds.map(positionOf).join(', ')}</span>
           <span className={`replay-result ${hand.result.netAmount >= 0 ? 'positive' : 'negative'}`}>
-            HERO {hand.result.netAmount >= 0 ? '+' : ''}
+            {hand.result.netAmount >= 0 ? '+' : ''}
             {formatAmount(hand.result.netAmount)}
           </span>
         </div>

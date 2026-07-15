@@ -312,6 +312,22 @@ export default function HandForm({ hand, onSaved, onCancel }: HandFormProps) {
         <PositionsEditor players={players} onChange={setPlayers} defaultStack={bb * 100} bb={bb} straddle={straddle} />
       </section>
 
+      {STREETS.map((street) => (
+        <section className="form-section" key={street}>
+          <StreetEditor
+            street={street}
+            data={streets[street]}
+            onChange={(data) => updateStreet(street, data)}
+            players={playersFor(street)}
+            allPlayers={players}
+            usedCardsElsewhere={usedCardsFor(street)}
+            potBefore={potBeforeStreet(handSnapshot, street)}
+            stakes={stakes}
+            stackBefore={stackBeforeFor(street)}
+          />
+        </section>
+      ))}
+
       <section className="form-section">
         <h3>ホールカード</h3>
         <div className="showdown-players">
@@ -343,22 +359,6 @@ export default function HandForm({ hand, onSaved, onCancel }: HandFormProps) {
             ))}
         </div>
       </section>
-
-      {STREETS.map((street) => (
-        <section className="form-section" key={street}>
-          <StreetEditor
-            street={street}
-            data={streets[street]}
-            onChange={(data) => updateStreet(street, data)}
-            players={playersFor(street)}
-            allPlayers={players}
-            usedCardsElsewhere={usedCardsFor(street)}
-            potBefore={potBeforeStreet(handSnapshot, street)}
-            stakes={stakes}
-            stackBefore={stackBeforeFor(street)}
-          />
-        </section>
-      ))}
 
       <section className="form-section">
         <h3>結果</h3>

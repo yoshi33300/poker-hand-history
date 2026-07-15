@@ -133,28 +133,29 @@ export default function HandList({ refreshToken, onOpen }: HandListProps) {
                     )}
                   </div>
                   <div className="hand-list-info">
-                    <div className="hand-list-title">{hand.title}</div>
+                    <div className="hand-list-title-row">
+                      <span className="hand-list-title">{hand.title}</span>
+                      <span className={`hand-list-result ${hand.result.netAmount >= 0 ? 'positive' : 'negative'}`}>
+                        {hand.result.netAmount >= 0 ? '+' : ''}
+                        {hand.result.netAmount}
+                        {hand.stakes.currency}
+                      </span>
+                    </div>
                     <div className="hand-list-meta">
-                      {new Date(hand.createdAt).toLocaleString('ja-JP')} ・{' '}
+                      {new Date(hand.createdAt).toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric' })} ・{' '}
                       {hand.stakes.currency}
                       {hand.stakes.sb}/{hand.stakes.currency}
                       {hand.stakes.bb} ・ {hero ? formatPosition(hero.position, hand.stakes.straddle) : '-'}
                       {hero && ` ・ ${formatBB(hero.startingStack, hand.stakes.bb)}`}
-                      {` ・ ポット ${totalPot(hand)}${hand.stakes.currency}`}
+                      {` ・ ${totalPot(hand)}${hand.stakes.currency}`}
                     </div>
                     {board.length > 0 && (
                       <div className="hand-list-board">
-                        <span className="hand-list-board-label">ボード</span>
                         {board.map((c) => (
                           <InlineCard key={c} code={c} />
                         ))}
                       </div>
                     )}
-                  </div>
-                  <div className={`hand-list-result ${hand.result.netAmount >= 0 ? 'positive' : 'negative'}`}>
-                    {hand.result.netAmount >= 0 ? '+' : ''}
-                    {hand.result.netAmount}
-                    {hand.stakes.currency}
                   </div>
                 </button>
               </li>
