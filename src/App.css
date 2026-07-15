@@ -594,31 +594,95 @@ button.secondary:hover {
   color: var(--danger);
 }
 
-/* Mobile: the grid opens as a bottom sheet (wheel-overlay), rows wrap into
-   two lines of larger cells so every card is on screen and tappable. */
+/* Mobile: the grid opens as a bottom sheet (wheel-overlay). Picking a card is
+   two steps — rank, then suit — so each step only needs a few big targets. */
 .card-sheet-body {
   padding: 0.75rem 0.75rem 1rem;
   max-height: 65vh;
   overflow-y: auto;
 }
 
-.card-sheet-body .card-grid-row {
-  width: auto;
-  flex-wrap: wrap;
-  gap: 4px;
-  margin-bottom: 8px;
-}
-
-.card-sheet-body .card-grid-cell,
-.card-sheet-body .card-grid-suit-label {
-  width: 2.6rem;
-  height: 2.6rem;
-  font-size: 1rem;
-}
-
 .card-sheet-body .card-grid-clear {
   padding: 0.6rem;
   font-size: 1rem;
+}
+
+.wheel-back {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-weight: 700;
+  font-size: 1rem;
+  padding: 0.2rem 0.4rem;
+  cursor: pointer;
+}
+
+.rank-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.rank-grid-cell {
+  padding: 0.9rem 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text-h);
+  font-size: 1.3rem;
+  font-weight: 700;
+}
+
+.rank-grid-cell:disabled {
+  opacity: 0.25;
+  cursor: not-allowed;
+}
+
+.suit-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.6rem;
+  margin-bottom: 0.75rem;
+}
+
+.suit-grid-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  padding: 1.1rem 0;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel);
+  font-size: 1.6rem;
+}
+
+.suit-grid-cell:disabled {
+  opacity: 0.25;
+  cursor: not-allowed;
+}
+
+.suit-grid-label {
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.suit-grid-cell.black {
+  color: var(--suit-black-bright);
+}
+
+.suit-grid-cell.red {
+  color: var(--suit-red-bright);
+}
+
+.suit-grid-cell.blue {
+  color: var(--suit-blue-bright);
+}
+
+.suit-grid-cell.green {
+  color: var(--suit-green-bright);
 }
 
 /* ---- Street editor ---- */

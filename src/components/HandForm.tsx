@@ -81,6 +81,12 @@ export default function HandForm({ hand, onSaved, onCancel }: HandFormProps) {
   const hasAnyAction = STREETS.some((s) => streets[s].actions.length > 0)
   const allBoardCards = [...streets.flop.board, ...streets.turn.board, ...streets.river.board]
   const boardComplete = allBoardCards.length === 5
+  // Once the user has started entering the flop (board or actions), preflop is
+  // treated as closed — a blind who never acted and never covered the bet is
+  // out, even though their preflop "turn" technically never formally passed.
+  const preflopSettled = STREETS.slice(1).some(
+    (s) => streets[s].board.length > 0 || streets[s].actions.length > 0,
+  )
 
   function holeCardsOf(p: Player): CardCode[] {
     return p.isHero ? heroHoleCards : (villainCards[p.id] ?? [])
@@ -335,7 +341,7 @@ export default function HandForm({ hand, onSaved, onCancel }: HandFormProps) {
               usedElsewhere={usedCardsFor('hole')}
             />
           </div>
-          {playersFor('preflop')
+          {playersFor(preflopSettled ? 'flop' : 'preflop')
             .filter((p) => !p.isHero)
             .map((p) => (
               <div key={p.id} className="showdown-player">
