@@ -2,14 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { createId } from '../id'
 import { createDefaultPlayers, formatPosition, orderForStreet } from '../players'
 import { saveHand } from '../db'
-import {
-  blindCoveredFinalBet,
-  heroNetAmount,
-  potBeforeStreet,
-  preflopPotType,
-  stackBeforeStreet,
-  survivors,
-} from '../pot'
+import { heroNetAmount, potBeforeStreet, preflopPotType, stackBeforeStreet, stillInStreet, survivors } from '../pot'
 import { determineShowdownWinners } from '../handRank'
 import { formatBB } from '../bb'
 import { STREETS } from '../types'
@@ -81,12 +74,6 @@ export default function HandForm({ hand, onSaved, onCancel }: HandFormProps) {
   const hasAnyAction = STREETS.some((s) => streets[s].actions.length > 0)
   const allBoardCards = [...streets.flop.board, ...streets.turn.board, ...streets.river.board]
   const boardComplete = allBoardCards.length === 5
-  // Once the user has started entering the flop (board or actions), preflop is
-  // treated as closed — a blind who never acted and never covered the bet is
-  // out, even though their preflop "turn" technically never formally passed.
-  const preflopSettled = STREETS.slice(1).some(
-    (s) => streets[s].board.length > 0 || streets[s].actions.length > 0,
-  )
 
   function holeCardsOf(p: Player): CardCode[] {
     return p.isHero ? heroHoleCards : (villainCards[p.id] ?? [])
@@ -138,11 +125,9 @@ export default function HandForm({ hand, onSaved, onCancel }: HandFormProps) {
       })
       return ordered.filter((p, i) => acted.has(p.id) || i > lastActedIdx)
     }
-    // Postflop: preflop is settled by now, so a player with no recorded
-    // preflop action only carries over if their blind post outright covered
-    // the final preflop bet (a limped BB, a straddler everyone just called) —
-    // otherwise their silence means they folded.
-    const acted = new Set(streets.preflop.actions.map((a) => a.playerId))
+    // Postflop: preflop is settled by now, so a player carries over only if
+    // they matched the final preflop bet (or are all-in) — a stale call from
+    // before a later raise doesn't count, same as never having acted at all.
     const folded = new Set<string>()
     for (let i = 0; i < streetIndex; i++) {
       for (const a of streets[STREETS[i]].actions) {
@@ -150,7 +135,7 @@ export default function HandForm({ hand, onSaved, onCancel }: HandFormProps) {
       }
     }
     const list = players.filter(
-      (p) => !folded.has(p.id) && (acted.has(p.id) || blindCoveredFinalBet(handSnapshot, p)),
+      (p) => !folded.has(p.id) && stillInStreet(handSnapshot, 'preflop', p),
     )
     return orderForStreet(street, list, utgStraddled)
   }
@@ -341,7 +326,7 @@ export default function HandForm({ hand, onSaved, onCancel }: HandFormProps) {
               usedElsewhere={usedCardsFor('hole')}
             />
           </div>
-          {playersFor(preflopSettled ? 'flop' : 'preflop')
+          {playersFor('flop')
             .filter((p) => !p.isHero)
             .map((p) => (
               <div key={p.id} className="showdown-player">

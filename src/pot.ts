@@ -164,64 +164,79 @@ export function totalContribution(
 }
 
 /**
- * A player with no recorded preflop action is still in the hand while their
- * blind post covers the current bet (BB in a limped pot, the straddler when
- * everyone just called). If it doesn't cover the bet, silence only means a
- * fold once their turn has actually passed — a blind who simply hasn't acted
- * yet (e.g. right after a same-round open) is still very much in the hand.
+ * Whether a player's contribution on `street` matches (or exceeds) that
+ * street's final bet — i.e. they called/raised to it — or they're all-in for
+ * less. A stale contribution from *before* a later raise doesn't count: only
+ * their most recent standing (which streetContribution already reflects)
+ * matters, so someone who acted once but never answered a subsequent raise
+ * reads the same as someone who never acted at all.
  */
-export function impliedInHand(hand: Pick<Hand, 'players' | 'stakes' | 'streets'>, player: Player): boolean {
-  const preflopBet = currentBetTo(
-    streetContribution('preflop', hand.streets.preflop, hand.players, hand.stakes),
-  )
-  const posted = blindBaseline(player, hand.stakes)
-  if (posted <= 0) return false
-  if (posted >= preflopBet) return true
+function respondedToBet(
+  street: Street,
+  data: StreetData,
+  players: Player[],
+  stakes: Hand['stakes'],
+  playerId: string,
+): boolean {
+  const contribution = streetContribution(street, data, players, stakes)
+  const betTo = currentBetTo(contribution)
+  const mine = contribution.perPlayer[playerId] ?? 0
+  if (mine >= betTo) return true
+  return data.actions.some((a) => a.playerId === playerId && a.type === 'allin')
+}
 
-  const utgStraddled = (hand.stakes.straddle ?? 0) > 0
-  const ordered = orderForStreet('preflop', hand.players, utgStraddled)
-  const acted = new Set(hand.streets.preflop.actions.map((a) => a.playerId))
+/**
+ * Ordering-based leniency: a player who hasn't matched the bet is still
+ * "pending" (silence doesn't yet mean a fold) as long as nobody positioned
+ * after them in the street's action order has acted at all. Once someone
+ * later has acted, their own window to respond is assumed to have passed.
+ */
+function turnPending(
+  street: Street,
+  data: StreetData,
+  players: Player[],
+  utgStraddled: boolean,
+  playerId: string,
+): boolean {
+  const ordered = orderForStreet(street, players, utgStraddled)
+  const acted = new Set(data.actions.map((a) => a.playerId))
   let lastActedIdx = -1
   ordered.forEach((p, i) => {
     if (acted.has(p.id)) lastActedIdx = i
   })
-  const playerIdx = ordered.findIndex((p) => p.id === player.id)
+  const playerIdx = ordered.findIndex((p) => p.id === playerId)
   return playerIdx > lastActedIdx
 }
 
 /**
- * Whether a player with no recorded preflop action can still be assumed "in"
- * once a later street has started — at that point preflop is settled, so
- * unlike impliedInHand there's no turn-order leniency: their blind post must
- * outright cover the final preflop bet, or their silence means they folded.
+ * Whether a player is still "in" on `street`: they matched its final bet (or
+ * are all-in), or their turn to respond to it simply hasn't arrived yet.
+ * Being passed over without matching — whether they never acted at all, or
+ * acted once but never answered a later raise — means they folded.
  */
-export function blindCoveredFinalBet(
+export function stillInStreet(
   hand: Pick<Hand, 'players' | 'stakes' | 'streets'>,
+  street: Street,
   player: Player,
 ): boolean {
-  const preflopBet = currentBetTo(
-    streetContribution('preflop', hand.streets.preflop, hand.players, hand.stakes),
-  )
-  const posted = blindBaseline(player, hand.stakes)
-  return posted > 0 && posted >= preflopBet
+  const data = hand.streets[street]
+  if (respondedToBet(street, data, hand.players, hand.stakes, player.id)) return true
+  const utgStraddled = (hand.stakes.straddle ?? 0) > 0
+  return turnPending(street, data, hand.players, utgStraddled, player.id)
 }
 
 /**
- * Players eligible to win the pot: joined the action (or posted enough blind
- * that no action was required, so a walk still has its winner) and never folded.
+ * Players eligible to win the pot: never folded, and still in as of preflop
+ * (matched the final preflop bet, are all-in, or haven't been passed over yet).
  */
 export function survivors(hand: Pick<Hand, 'players' | 'stakes' | 'streets'>): Player[] {
-  const acted = new Set<string>()
   const folded = new Set<string>()
   for (const street of STREETS) {
     for (const a of hand.streets[street].actions) {
-      acted.add(a.playerId)
       if (a.type === 'fold') folded.add(a.playerId)
     }
   }
-  return hand.players.filter(
-    (p) => !folded.has(p.id) && (acted.has(p.id) || impliedInHand(hand, p)),
-  )
+  return hand.players.filter((p) => !folded.has(p.id) && stillInStreet(hand, 'preflop', p))
 }
 
 /**

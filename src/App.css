@@ -594,95 +594,162 @@ button.secondary:hover {
   color: var(--danger);
 }
 
-/* Mobile: the grid opens as a bottom sheet (wheel-overlay). Picking a card is
-   two steps — rank, then suit — so each step only needs a few big targets. */
-.card-sheet-body {
-  padding: 0.75rem 0.75rem 1rem;
-  max-height: 65vh;
-  overflow-y: auto;
+/* Mobile: card entry opens as a bottom sheet (wheel-overlay) showing every
+   slot, the rank keypad and the suit row all at once — rank then suit, no
+   step-by-step navigation needed. */
+.card-sheet-slots {
+  display: flex;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 1.25rem 1rem 0.75rem;
 }
 
-.card-sheet-body .card-grid-clear {
-  padding: 0.6rem;
-  font-size: 1rem;
-}
-
-.wheel-back {
-  background: none;
-  border: none;
-  color: var(--accent);
+.card-sheet-slot {
+  width: 4.6rem;
+  height: 6.4rem;
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.15rem;
+  font-size: 1.7rem;
   font-weight: 700;
-  font-size: 1rem;
-  padding: 0.2rem 0.4rem;
-  cursor: pointer;
+  color: var(--text);
 }
 
-.rank-grid {
+.card-sheet-slot svg {
+  width: 1em;
+  height: 1em;
+}
+
+.card-sheet-slot.active {
+  border-color: var(--highlight);
+  color: var(--highlight);
+}
+
+.card-sheet-slot.black {
+  color: var(--suit-black-bright);
+}
+
+.card-sheet-slot.red {
+  color: var(--suit-red-bright);
+}
+
+.card-sheet-slot.blue {
+  color: var(--suit-blue-bright);
+}
+
+.card-sheet-slot.green {
+  color: var(--suit-green-bright);
+}
+
+.card-sheet-ranks {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 0.5rem;
-  margin-bottom: 0.75rem;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0.4rem;
+  padding: 0.75rem 1rem 0;
 }
 
-.rank-grid-cell {
-  padding: 0.9rem 0;
+.card-sheet-rank {
+  padding: 0.85rem 0;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 10px;
   background: var(--panel);
   color: var(--text-h);
-  font-size: 1.3rem;
+  font-size: 1.15rem;
   font-weight: 700;
 }
 
-.rank-grid-cell:disabled {
+.card-sheet-rank.selected {
+  border-color: var(--highlight);
+  color: var(--highlight);
+}
+
+.card-sheet-rank:disabled {
   opacity: 0.25;
   cursor: not-allowed;
 }
 
-.suit-grid {
+.card-sheet-suits {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 0.6rem;
-  margin-bottom: 0.75rem;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.5rem;
+  padding: 0.75rem 1rem 0;
 }
 
-.suit-grid-cell {
+.card-sheet-suit {
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.3rem;
-  padding: 1.1rem 0;
+  padding: 1rem 0;
   border: 1px solid var(--border);
   border-radius: 10px;
   background: var(--panel);
   font-size: 1.6rem;
 }
 
-.suit-grid-cell:disabled {
+.card-sheet-suit svg {
+  width: 1em;
+  height: 1em;
+}
+
+.card-sheet-suit:disabled {
   opacity: 0.25;
   cursor: not-allowed;
 }
 
-.suit-grid-label {
-  font-size: 1.1rem;
-  font-weight: 700;
-}
-
-.suit-grid-cell.black {
+.card-sheet-suit.black {
   color: var(--suit-black-bright);
 }
 
-.suit-grid-cell.red {
+.card-sheet-suit.red {
   color: var(--suit-red-bright);
 }
 
-.suit-grid-cell.blue {
+.card-sheet-suit.blue {
   color: var(--suit-blue-bright);
 }
 
-.suit-grid-cell.green {
+.card-sheet-suit.green {
   color: var(--suit-green-bright);
+}
+
+.card-sheet-footer {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  padding: 1.25rem 1rem;
+  padding-bottom: calc(1.25rem + env(safe-area-inset-bottom));
+}
+
+.card-sheet-text-button {
+  background: none;
+  border: none;
+  color: var(--text);
+  font-size: 0.95rem;
+}
+
+.card-sheet-text-button:disabled {
+  opacity: 0.35;
+}
+
+.card-sheet-ok {
+  margin-left: auto;
+  padding: 0.65rem 1.8rem;
+  border: none;
+  border-radius: 10px;
+  background: var(--panel);
+  color: var(--text);
+  opacity: 0.4;
+  font-weight: 700;
+}
+
+.card-sheet-ok:not(:disabled) {
+  background: var(--accent);
+  color: #fff;
+  opacity: 1;
 }
 
 /* ---- Street editor ---- */

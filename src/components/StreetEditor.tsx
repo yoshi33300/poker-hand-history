@@ -136,7 +136,7 @@ export default function StreetEditor({
               <span className={`action-type action-${a.type}`}>{ACTION_LABELS[a.type]}</span>
               {a.amount !== undefined && a.amount > 0 && (
                 <span className="action-amount">
-                  合計 {a.amount} ({formatBB(a.amount, stakes.bb)})
+                  {a.amount} ({formatBB(a.amount, stakes.bb)})
                 </span>
               )}
               <button

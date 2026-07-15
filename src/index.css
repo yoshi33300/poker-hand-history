@@ -8,6 +8,8 @@
   --accent-hover: #2c9c61;
   --danger: #e0554a;
   --table-felt: #0a3626;
+  /* Highlights the actively-edited card slot/rank in the mobile card sheet. */
+  --highlight: #e0b73c;
 
   /* 4-color deck: suits are told apart by color as well as shape.
      "-bright" variants keep suits legible on the dark background. */
