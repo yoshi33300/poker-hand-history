@@ -262,9 +262,9 @@ button.secondary:hover {
 }
 
 .wheel-header {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  justify-content: space-between;
   padding: 0.75rem 1rem;
   border-bottom: 1px solid var(--border);
 }
@@ -272,6 +272,11 @@ button.secondary:hover {
 .wheel-title {
   font-weight: 700;
   color: var(--text-h);
+  justify-self: start;
+}
+
+.wheel-header-center {
+  justify-self: center;
 }
 
 .wheel-done {
@@ -282,6 +287,35 @@ button.secondary:hover {
   font-size: 1rem;
   padding: 0.2rem 0.4rem;
   cursor: pointer;
+  justify-self: end;
+}
+
+.wheel-manual-toggle {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  color: var(--text);
+  font-size: 0.82rem;
+  padding: 0.28rem 0.75rem;
+  cursor: pointer;
+}
+
+.wheel-manual-toggle:hover {
+  border-color: var(--text);
+  color: var(--text-h);
+}
+
+.wheel-manual-input {
+  width: 6rem;
+  padding: 0.3rem 0.5rem;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text-h);
+  text-align: center;
+  font-weight: 700;
+  /* Keep at/above 16px so iOS Safari doesn't auto-zoom the page on focus. */
+  font-size: 1rem;
 }
 
 .wheel-body {

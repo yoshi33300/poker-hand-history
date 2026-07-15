@@ -183,12 +183,12 @@ export default function StreetEditor({
           <div className="action-add-row">
             {AMOUNT_TYPES.includes(actionType) && (
               <label className="action-amount-label">
-                <span className="action-caption">合計投入額</span>
+                <span className="action-caption">金額</span>
                 <input
                   type="number"
                   min={0}
-                  placeholder="合計投入額"
-                  aria-label="合計投入額"
+                  placeholder="金額"
+                  aria-label="金額"
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                 />

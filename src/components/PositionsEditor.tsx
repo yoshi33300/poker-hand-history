@@ -37,8 +37,7 @@ export default function PositionsEditor({ players, onChange, defaultStack, bb, s
   // Scroll up/down over a stack input to nudge it by one step, like a spinner.
   function handleStackWheel(e: React.WheelEvent<HTMLInputElement>, current: number, onSet: (next: number) => void) {
     e.preventDefault()
-    const step = 10
-    onSet(Math.max(0, current + (e.deltaY < 0 ? step : -step)))
+    onSet(Math.max(0, current + (e.deltaY < 0 ? stackStep : -stackStep)))
   }
 
   // The "all stacks" field shows the shared value, or blank when stacks differ.
@@ -47,6 +46,9 @@ export default function PositionsEditor({ players, onChange, defaultStack, bb, s
     : null
 
   const pickerMax = Math.max(2000, bb * 500)
+  // A flat 10-chip step barely moves the needle once stacks run into the
+  // thousands — step by 5BB worth of chips instead so each tick is meaningful.
+  const stackStep = Math.max(1, Math.round(bb * 5))
   const pickerTarget =
     picker?.kind === 'one' ? players.find((p) => p.id === picker.id) : null
 
@@ -69,7 +71,7 @@ export default function PositionsEditor({ players, onChange, defaultStack, bb, s
             className="stack-input"
             type="number"
             min={0}
-            step={10}
+            step={stackStep}
             value={commonStack ?? ''}
             readOnly={isNarrow}
             onClick={() => {
@@ -99,7 +101,7 @@ export default function PositionsEditor({ players, onChange, defaultStack, bb, s
               className="position-stack"
               type="number"
               min={0}
-              step={10}
+              step={stackStep}
               value={p.startingStack}
               readOnly={isNarrow}
               onClick={() => {
@@ -120,7 +122,7 @@ export default function PositionsEditor({ players, onChange, defaultStack, bb, s
           value={commonStack ?? defaultStack}
           min={0}
           max={pickerMax}
-          step={10}
+          step={stackStep}
           formatSub={(v) => formatBB(v, bb)}
           onSelect={setAllStacks}
           onClose={() => setPicker(null)}
@@ -132,7 +134,7 @@ export default function PositionsEditor({ players, onChange, defaultStack, bb, s
           value={pickerTarget.startingStack}
           min={0}
           max={pickerMax}
-          step={10}
+          step={stackStep}
           formatSub={(v) => formatBB(v, bb)}
           onSelect={(v) => updateStack(pickerTarget.id, v)}
           onClose={() => setPicker(null)}
