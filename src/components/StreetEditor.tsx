@@ -125,6 +125,7 @@ export default function StreetEditor({
           value={data.board}
           onChange={(board) => onChange({ ...data, board })}
           usedElsewhere={usedCardsElsewhere}
+          sortByRank
         />
       )}
 
@@ -156,8 +157,8 @@ export default function StreetEditor({
         <div className="action-add-form">
           <div className="action-add-row">
             <label className="action-position-label">
-              ポジション
-              <select value={playerId} onChange={(e) => setManualId(e.target.value)}>
+              <span className="action-caption">ポジション</span>
+              <select value={playerId} aria-label="ポジション" onChange={(e) => setManualId(e.target.value)}>
                 {players.map((p) => (
                   <option key={p.id} value={p.id}>
                     {formatPosition(p.position, stakes.straddle)}
@@ -182,11 +183,12 @@ export default function StreetEditor({
           <div className="action-add-row">
             {AMOUNT_TYPES.includes(actionType) && (
               <label className="action-amount-label">
-                合計投入額
+                <span className="action-caption">合計投入額</span>
                 <input
                   type="number"
                   min={0}
-                  placeholder="金額"
+                  placeholder="合計投入額"
+                  aria-label="合計投入額"
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                 />

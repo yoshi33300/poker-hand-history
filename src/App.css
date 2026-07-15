@@ -87,6 +87,39 @@
   width: 4rem;
 }
 
+/* Full-width field (e.g. the title input). */
+.field-row .field-grow {
+  flex: 1;
+  min-width: 0;
+}
+
+.field-row .field-grow input {
+  width: 100%;
+}
+
+/* Currency rides on the title row so the blinds fit one line even on phones. */
+.currency-field input {
+  width: 3.5rem;
+  text-align: center;
+}
+
+/* Blind/ante fields share one even grid so nothing wraps into a lone orphan. */
+.stakes-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.stakes-row label {
+  min-width: 0;
+}
+
+.stakes-row input,
+.stakes-row input[type='number'] {
+  width: 100%;
+  text-align: center;
+}
+
 .notes-label {
   width: 100%;
 }
@@ -1934,6 +1967,58 @@ button.icon-button.danger:hover:not(:disabled) {
     padding: 1rem;
   }
   .app-main {
-    padding: 1rem;
+    padding: 0.75rem;
+  }
+  .form-section {
+    padding: 0.85rem 0.9rem;
+  }
+  /* SB/BB/アンティ/ストラドルを 1 行に保つ: 隙間と内側余白を詰めて幅を確保。 */
+  .stakes-row {
+    gap: 0.5rem 0.4rem;
+  }
+  .stakes-row input,
+  .stakes-row input[type='number'] {
+    padding: 0.45rem 0.25rem;
+  }
+
+  /* アクション入力を 2 行に圧縮: キャプションを隠し、
+     1 行目=ポジション+アクション種別、2 行目=金額+追加ボタン。 */
+  .action-caption {
+    display: none;
+  }
+  .action-add-form {
+    padding: 0.5rem;
+    gap: 0.4rem;
+  }
+  .action-add-row {
+    gap: 0.4rem;
+  }
+  .action-position-label select {
+    padding: 0.4rem 0.3rem;
+  }
+  .action-type-buttons {
+    flex: 1;
+    flex-wrap: nowrap;
+    gap: 0.25rem;
+  }
+  .action-type-button {
+    flex: 1;
+    min-width: 0;
+    padding: 0.5rem 0.15rem;
+    font-size: 0.78rem;
+    white-space: nowrap;
+    text-align: center;
+  }
+  .action-amount-label {
+    flex: 1;
+    min-width: 0;
+  }
+  .action-add-row input[type='number'] {
+    width: 100%;
+  }
+  .action-add-button {
+    flex: 1.2;
+    white-space: nowrap;
+    padding: 0.5rem 0.6rem;
   }
 }

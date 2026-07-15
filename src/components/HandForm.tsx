@@ -237,7 +237,7 @@ export default function HandForm({ hand, onSaved, onCancel }: HandFormProps) {
       <section className="form-section">
         <h3>基本情報</h3>
         <div className="field-row">
-          <label>
+          <label className="field-grow">
             タイトル (空欄なら自動)
             <input
               type="text"
@@ -246,12 +246,12 @@ export default function HandForm({ hand, onSaved, onCancel }: HandFormProps) {
               placeholder={autoTitle()}
             />
           </label>
-        </div>
-        <div className="field-row">
-          <label>
+          <label className="currency-field">
             通貨
-            <input type="text" value={currency} onChange={(e) => setCurrency(e.target.value)} style={{ width: '3.5rem' }} />
+            <input type="text" value={currency} onChange={(e) => setCurrency(e.target.value)} />
           </label>
+        </div>
+        <div className="field-row stakes-row">
           <label>
             SB
             <input
@@ -324,6 +324,7 @@ export default function HandForm({ hand, onSaved, onCancel }: HandFormProps) {
               value={heroHoleCards}
               onChange={setHeroHoleCards}
               usedElsewhere={usedCardsFor('hole')}
+              sortByRank
             />
           </div>
           {playersFor('flop')
@@ -336,6 +337,7 @@ export default function HandForm({ hand, onSaved, onCancel }: HandFormProps) {
                   value={villainCards[p.id] ?? []}
                   onChange={(cards) => setVillainCards((prev) => ({ ...prev, [p.id]: cards }))}
                   usedElsewhere={usedCardsForVillain(p.id)}
+                  sortByRank
                 />
               </div>
             ))}

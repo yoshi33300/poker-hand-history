@@ -10,9 +10,16 @@ interface CardPickerProps {
   value: CardCode[]
   onChange: (cards: CardCode[]) => void
   usedElsewhere: CardCode[]
+  /** Hole cards read easier with the stronger card on the left; board cards must stay in deal order. */
+  sortByRank?: boolean
 }
 
-export default function CardPicker({ count, value, onChange, usedElsewhere }: CardPickerProps) {
+// Higher rank first (RANKS is already strongest-to-weakest: A, K, Q, ... 2).
+function sortByStrength(cards: CardCode[]): CardCode[] {
+  return [...cards].sort((a, b) => RANKS.indexOf(parseCard(a).rank) - RANKS.indexOf(parseCard(b).rank))
+}
+
+export default function CardPicker({ count, value, onChange, usedElsewhere, sortByRank }: CardPickerProps) {
   const [openSlot, setOpenSlot] = useState<number | null>(null)
   const isNarrow = useIsNarrow()
 
@@ -29,7 +36,8 @@ export default function CardPicker({ count, value, onChange, usedElsewhere }: Ca
   function selectCard(slot: number, code: CardCode) {
     const next = [...value]
     next[slot] = code
-    onChange(next.slice(0, count).filter(Boolean) as CardCode[])
+    const compact = next.slice(0, count).filter(Boolean) as CardCode[]
+    onChange(sortByRank ? sortByStrength(compact) : compact)
     setOpenSlot(null)
   }
 
@@ -122,7 +130,8 @@ export default function CardPicker({ count, value, onChange, usedElsewhere }: Ca
   }
 
   function confirmSheet() {
-    onChange(draft.filter(Boolean) as CardCode[])
+    const compact = draft.filter(Boolean) as CardCode[]
+    onChange(sortByRank ? sortByStrength(compact) : compact)
     setOpenSlot(null)
   }
 
