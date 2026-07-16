@@ -1780,6 +1780,16 @@ button.icon-button.danger:hover:not(:disabled) {
   min-height: 1.6em;
 }
 
+/* A street header or board reveal bundled into the same step as the action
+   that follows it — shown above the action, de-emphasized so the action
+   (the main line) still reads first. */
+.replay-current-sub {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--accent);
+  opacity: 0.85;
+}
+
 .replay-blind-note {
   text-align: center;
   font-size: 0.8rem;

@@ -4,7 +4,7 @@ import type { CardCode, Hand, HandAction, Street } from '../types'
 import { formatCard } from '../cards'
 import { formatBB } from '../bb'
 import { blindBaseline } from '../pot'
-import { formatPosition } from '../players'
+import { formatPosition, orderForStreet } from '../players'
 import { buildHandText } from '../shareText'
 // AIレビューを有効化する場合はこの import と下部の <AiReview hand={hand} /> を戻す
 // import AiReview from './AiReview'
@@ -174,6 +174,37 @@ export default function HandReplayer({ hand, onBack, onEdit }: HandReplayerProps
   const currentEvent = currentIndex > 0 ? events[currentIndex - 1] : null
   const actingPlayerId = currentEvent?.kind === 'action' ? currentEvent.action.playerId : null
 
+  // Everything folded into this stop since the previous one — a street
+  // header and board reveal ride along with the action that follows them,
+  // so both still need to be shown, not just the action itself.
+  const previousIndex = step > 1 ? stops[step - 2] : 0
+  const currentBundle = currentIndex > 0 ? events.slice(previousIndex, currentIndex) : []
+
+  // Players passed over during preflop so far — someone later in the action
+  // order has already acted while they haven't, same "implicit fold" rule
+  // the hand form uses. Only matters before the flop; once reached, these
+  // players simply drop off the table via visibleIds below instead.
+  const implicitFoldedIds = useMemo(() => {
+    if (state.street !== 'preflop') return new Set<string>()
+    const utgStraddled = (hand.stakes.straddle ?? 0) > 0
+    const ordered = orderForStreet('preflop', hand.players, utgStraddled)
+    const actedSoFar = new Set(
+      events
+        .slice(0, currentIndex)
+        .filter((e) => e.kind === 'action' && e.street === 'preflop')
+        .map((e) => (e as { kind: 'action'; action: HandAction }).action.playerId),
+    )
+    let lastActedIdx = -1
+    ordered.forEach((p, i) => {
+      if (actedSoFar.has(p.id)) lastActedIdx = i
+    })
+    const result = new Set<string>()
+    ordered.forEach((p, i) => {
+      if (i <= lastActedIdx && !actedSoFar.has(p.id)) result.add(p.id)
+    })
+    return result
+  }, [state.street, currentIndex, events, hand])
+
   const preflopActed = useMemo(
     () => new Set(hand.streets.preflop.actions.map((a) => a.playerId)),
     [hand],
@@ -253,11 +284,23 @@ export default function HandReplayer({ hand, onBack, onEdit }: HandReplayerProps
         state={state}
         actingPlayerId={actingPlayerId}
         visibleIds={visibleIds}
+        implicitFoldedIds={implicitFoldedIds}
         formatAmount={formatAmount}
       />
 
       <div className="replay-current-event">
-        {currentEvent ? describe(currentEvent) : 'ハンド開始前'}
+        {currentEvent ? (
+          <>
+            {currentBundle.slice(0, -1).map((e, i) => (
+              <div key={i} className="replay-current-sub">
+                {describe(e)}
+              </div>
+            ))}
+            <div>{describe(currentEvent)}</div>
+          </>
+        ) : (
+          'ハンド開始前'
+        )}
       </div>
 
       <div className="replay-controls">

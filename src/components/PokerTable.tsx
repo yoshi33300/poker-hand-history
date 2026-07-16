@@ -26,6 +26,9 @@ interface PokerTableProps {
   actingPlayerId: string | null
   /** Players still shown on the table (per the hide-non-actors rule). */
   visibleIds: Set<string>
+  /** Players passed over so far this preflop — dimmed like an explicit fold,
+   * since someone later in the order already acted without them. */
+  implicitFoldedIds: Set<string>
   /** Formats a chip amount for display (chips or BB, depending on the unit toggle). */
   formatAmount: (chips: number) => string
 }
@@ -42,7 +45,14 @@ const BADGE_CLASS: Record<string, string> = {
   'post-ante': 'badge-post',
 }
 
-export default function PokerTable({ hand, state, actingPlayerId, visibleIds, formatAmount }: PokerTableProps) {
+export default function PokerTable({
+  hand,
+  state,
+  actingPlayerId,
+  visibleIds,
+  implicitFoldedIds,
+  formatAmount,
+}: PokerTableProps) {
   // Physical seating runs clockwise SB, BB, UTG, ..., BTN; rotate so hero sits
   // bottom-center and lay the rest clockwise around the ellipse.
   const seats = useMemo(() => {
@@ -95,7 +105,7 @@ export default function PokerTable({ hand, state, actingPlayerId, visibleIds, fo
 
       {seats.map(({ player: p, x, y }) => {
         if (!visibleIds.has(p.id)) return null
-        const folded = state.folded.has(p.id)
+        const folded = state.folded.has(p.id) || implicitFoldedIds.has(p.id)
         const last = state.lastAction[p.id]
         return (
           <div key={p.id} className="seat-anchor" style={{ left: `${x}%`, top: `${y}%` }}>
