@@ -3,10 +3,11 @@ import { ACTION_LABELS, STREET_LABELS, STREETS } from '../types'
 import type { CardCode, Hand, HandAction, Street } from '../types'
 import { formatCard } from '../cards'
 import { formatBB } from '../bb'
-import { blindBaseline } from '../pot'
-import { formatPosition, orderForStreet } from '../players'
+import { blindBaseline, matchedPreflopBet } from '../pot'
+import { formatPosition, withImplicitPreflopFolds } from '../players'
 import { buildHandText } from '../shareText'
-import AiReview from './AiReview'
+// AIレビューを有効化する場合はこの import と下部の <AiReview hand={hand} /> を戻す
+// import AiReview from './AiReview'
 import PokerTable from './PokerTable'
 import type { TableState } from './PokerTable'
 
@@ -179,39 +180,31 @@ export default function HandReplayer({ hand, onBack, onEdit }: HandReplayerProps
   const previousIndex = step > 1 ? stops[step - 2] : 0
   const currentBundle = currentIndex > 0 ? events.slice(previousIndex, currentIndex) : []
 
-  // Players passed over during preflop so far — someone later in the action
-  // order has already acted while they haven't, same "implicit fold" rule
-  // the hand form uses. Only matters before the flop; once reached, these
-  // players simply drop off the table via visibleIds below instead.
+  // Players passed over during preflop so far — dimmed like an explicit
+  // fold. Only matters before the flop; once reached, these players simply
+  // drop off the table via visibleIds below instead.
   const implicitFoldedIds = useMemo(() => {
     if (state.street !== 'preflop') return new Set<string>()
     const utgStraddled = (hand.stakes.straddle ?? 0) > 0
-    const ordered = orderForStreet('preflop', hand.players, utgStraddled)
-    const actedSoFar = new Set(
-      events
-        .slice(0, currentIndex)
-        .filter((e) => e.kind === 'action' && e.street === 'preflop')
-        .map((e) => (e as { kind: 'action'; action: HandAction }).action.playerId),
-    )
-    let lastActedIdx = -1
-    ordered.forEach((p, i) => {
-      if (actedSoFar.has(p.id)) lastActedIdx = i
-    })
+    const preflopActionsSoFar = events
+      .slice(0, currentIndex)
+      .filter((e): e is Extract<TimelineEvent, { kind: 'action' }> => e.kind === 'action' && e.street === 'preflop')
+      .map((e) => e.action)
     const result = new Set<string>()
-    ordered.forEach((p, i) => {
-      if (i <= lastActedIdx && !actedSoFar.has(p.id)) result.add(p.id)
-    })
+    for (const ev of withImplicitPreflopFolds(hand.players, preflopActionsSoFar, utgStraddled)) {
+      if (ev.kind === 'implicit-fold') result.add(ev.playerId)
+    }
     return result
   }, [state.street, currentIndex, events, hand])
 
-  const preflopActed = useMemo(
-    () => new Set(hand.streets.preflop.actions.map((a) => a.playerId)),
-    [hand],
-  )
+  // Postflop, a player only stays on the table if they actually matched the
+  // final preflop bet (or went all-in) — merely having acted at some point
+  // isn't enough, since an earlier raiser who got 4bet and never responded
+  // folded just as surely as someone who never acted at all.
   const reachedPostflop = state.street !== 'preflop'
   const visibleIds = new Set(
     hand.players
-      .filter((p) => !reachedPostflop || preflopActed.has(p.id))
+      .filter((p) => !reachedPostflop || matchedPreflopBet(hand, p.id))
       .map((p) => p.id),
   )
 
@@ -363,7 +356,7 @@ export default function HandReplayer({ hand, onBack, onEdit }: HandReplayerProps
         </div>
       )}
 
-      <AiReview hand={hand} />
+      {/* <AiReview hand={hand} /> */}
     </div>
   )
 }

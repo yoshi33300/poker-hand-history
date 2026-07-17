@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { createId } from '../id'
 import { createDefaultPlayers, formatPosition, orderForStreet } from '../players'
 import { saveHand } from '../db'
-import { heroNetAmount, potBeforeStreet, preflopPotType, stackBeforeStreet, stillInStreet, survivors } from '../pot'
+import { heroNetAmount, matchedPreflopBet, potBeforeStreet, preflopPotType, stackBeforeStreet, survivors } from '../pot'
 import { determineShowdownWinners } from '../handRank'
 import { formatBB } from '../bb'
 import { STREETS } from '../types'
@@ -135,7 +135,7 @@ export default function HandForm({ hand, onSaved, onCancel }: HandFormProps) {
       }
     }
     const list = players.filter(
-      (p) => !folded.has(p.id) && stillInStreet(handSnapshot, 'preflop', p),
+      (p) => !folded.has(p.id) && matchedPreflopBet(handSnapshot, p.id),
     )
     return orderForStreet(street, list, utgStraddled)
   }

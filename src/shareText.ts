@@ -1,25 +1,12 @@
-import { STREETS, STREET_LABELS } from './types'
+import { ACTION_LABELS, STREETS, STREET_LABELS } from './types'
 import type { ActionType, Hand, HandAction } from './types'
 import { formatCard } from './cards'
 import { effectiveStack, potBeforeStreet } from './pot'
-import { formatPosition } from './players'
+import { formatPosition, withImplicitPreflopFolds } from './players'
 import { formatBB } from './bb'
 
-// Poker shorthand: r = raise, b = bet, c = call, x = check, f = fold, ai = all-in.
-const ACTION_SHORT: Record<ActionType, string> = {
-  fold: 'f',
-  check: 'x',
-  call: 'c',
-  bet: 'b',
-  raise: 'r',
-  allin: 'ai',
-  'post-sb': 'sb',
-  'post-bb': 'bb',
-  'post-ante': 'ante',
-}
-
 // Amounts are shown only where they carry information (bet/raise/all-in sizes);
-// a call always matches the current bet, so "c" alone reads fine.
+// a call always matches the current bet, so "Call" alone reads fine.
 const AMOUNT_SHOWN: ActionType[] = ['bet', 'raise', 'allin']
 
 function positionOf(hand: Hand, playerId: string): string {
@@ -27,9 +14,9 @@ function positionOf(hand: Hand, playerId: string): string {
   return p ? formatPosition(p.position, hand.stakes.straddle) : '?'
 }
 
-function shortAction(hand: Hand, a: HandAction): string {
-  const amount = AMOUNT_SHOWN.includes(a.type) && a.amount ? a.amount : ''
-  return `${positionOf(hand, a.playerId)} ${ACTION_SHORT[a.type]}${amount}`
+function describeAction(hand: Hand, a: HandAction): string {
+  const amount = AMOUNT_SHOWN.includes(a.type) && a.amount ? ` ${formatBB(a.amount, hand.stakes.bb)}` : ''
+  return `${positionOf(hand, a.playerId)} ${ACTION_LABELS[a.type]}${amount}`
 }
 
 /** Compact, chat-friendly hand history text. */
@@ -50,28 +37,40 @@ export function buildHandText(hand: Hand): string {
   )
   lines.push('')
 
-  // Preflop folds from players who did nothing else are noise — everyone who
-  // isn't mentioned obviously folded. Folds after a raise etc. stay visible.
-  const preflopActionCount = new Map<string, number>()
-  for (const a of hand.streets.preflop.actions) {
-    preflopActionCount.set(a.playerId, (preflopActionCount.get(a.playerId) ?? 0) + 1)
+  // Preflop is expanded with synthetic fold lines for anyone the action
+  // order silently skipped (e.g. a limper who never gets revisited after a
+  // later re-raise) — otherwise a raise they made earlier would look like
+  // they were still live. Folds from players who did nothing else are noise
+  // and dropped — everyone not mentioned obviously folded outright.
+  const utgStraddled = (hand.stakes.straddle ?? 0) > 0
+  const preflopEvents = withImplicitPreflopFolds(hand.players, hand.streets.preflop.actions, utgStraddled)
+  const preflopEventCount = new Map<string, number>()
+  for (const ev of preflopEvents) {
+    const pid = ev.kind === 'action' ? ev.action.playerId : ev.playerId
+    preflopEventCount.set(pid, (preflopEventCount.get(pid) ?? 0) + 1)
   }
+  const visiblePreflopEvents = preflopEvents.filter((ev) => {
+    const pid = ev.kind === 'action' ? ev.action.playerId : ev.playerId
+    const isFold = ev.kind === 'implicit-fold' || ev.action.type === 'fold'
+    return !(isFold && (preflopEventCount.get(pid) ?? 0) === 1)
+  })
 
   for (const street of STREETS) {
     const data = hand.streets[street]
-    const actions =
+    const streetLines =
       street === 'preflop'
-        ? data.actions.filter(
-            (a) => !(a.type === 'fold' && (preflopActionCount.get(a.playerId) ?? 0) === 1),
+        ? visiblePreflopEvents.map((ev) =>
+            ev.kind === 'action'
+              ? describeAction(hand, ev.action)
+              : `${positionOf(hand, ev.playerId)} ${ACTION_LABELS.fold}`,
           )
-        : data.actions
-    if (actions.length === 0 && data.board.length === 0) continue
+        : data.actions.map((a) => describeAction(hand, a))
+    if (streetLines.length === 0 && data.board.length === 0) continue
     const boardText = data.board.length > 0 ? ` ${data.board.map(formatCard).join('')}` : ''
-    const potText = street !== 'preflop' ? ` (pot${potBeforeStreet(hand, street)})` : ''
+    const potChips = potBeforeStreet(hand, street)
+    const potText = street !== 'preflop' ? ` (pot ${formatBB(potChips, hand.stakes.bb)})` : ''
     lines.push(`${STREET_LABELS[street]}${boardText}${potText}`)
-    for (const a of actions) {
-      lines.push(shortAction(hand, a))
-    }
+    lines.push(...streetLines)
     lines.push('')
   }
 
@@ -80,7 +79,7 @@ export function buildHandText(hand: Hand): string {
     const net = hand.result.netAmount
     const sign = net > 0 ? '+' : ''
     lines.push(
-      `勝者: ${winners.map((id) => positionOf(hand, id)).join(', ')} / HERO ${sign}${net}${hand.stakes.currency} (${sign}${formatBB(net, hand.stakes.bb)})`,
+      `勝者: ${winners.map((id) => positionOf(hand, id)).join(', ')} / ${sign}${formatBB(net, hand.stakes.bb)}`,
     )
     lines.push('')
   }

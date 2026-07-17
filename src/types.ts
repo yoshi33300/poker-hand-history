@@ -101,8 +101,8 @@ export const ACTION_LABELS: Record<ActionType, string> = {
 }
 
 export const STREET_LABELS: Record<Street, string> = {
-  preflop: 'プリフロップ',
-  flop: 'フロップ',
-  turn: 'ターン',
-  river: 'リバー',
+  preflop: 'Preflop',
+  flop: 'Flop',
+  turn: 'Turn',
+  river: 'River',
 }

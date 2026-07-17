@@ -86,6 +86,51 @@ export function orderForStreet(street: Street, players: Player[], utgStraddled =
   return sorted
 }
 
+export type PreflopFoldEvent =
+  | { kind: 'action'; action: HandAction }
+  | { kind: 'implicit-fold'; playerId: string }
+
+/**
+ * Replays preflop actions in chronological order and interleaves them with
+ * synthetic "implicit fold" markers wherever the action order skipped a
+ * seat without ever recording a fold for them — e.g. an early limper who
+ * never gets revisited after a later re-raise. A simple "highest
+ * table-position index that's acted" check breaks once action returns to an
+ * earlier seat (limper re-raised, folds to the 3bet without a recorded
+ * action), so this walks a cursor through the seating order action by
+ * action instead. All-in players are skipped over without penalty — they
+ * simply can't act again, that isn't a fold.
+ */
+export function withImplicitPreflopFolds(
+  players: Player[],
+  actions: HandAction[],
+  utgStraddled: boolean,
+): PreflopFoldEvent[] {
+  const ordered = orderForStreet('preflop', players, utgStraddled)
+  const stillIn = new Set(ordered.map((p) => p.id))
+  const allIn = new Set<string>()
+  const events: PreflopFoldEvent[] = []
+  let cursor = 0 // index in `ordered` of the next seat expected to act
+
+  for (const action of actions) {
+    const idx = ordered.findIndex((p) => p.id === action.playerId)
+    if (idx !== -1) {
+      for (let i = cursor; i !== idx; i = (i + 1) % ordered.length) {
+        const seat = ordered[i]
+        if (stillIn.has(seat.id) && !allIn.has(seat.id)) {
+          stillIn.delete(seat.id)
+          events.push({ kind: 'implicit-fold', playerId: seat.id })
+        }
+      }
+      if (action.type === 'fold') stillIn.delete(action.playerId)
+      if (action.type === 'allin') allIn.add(action.playerId)
+      cursor = (idx + 1) % ordered.length
+    }
+    events.push({ kind: 'action', action })
+  }
+  return events
+}
+
 // Who most likely acts next on this street, given the actions recorded so far.
 // Players who folded during this street are skipped.
 export function nextToAct(orderedPlayers: Player[], actions: HandAction[]): string {

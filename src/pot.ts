@@ -1,6 +1,5 @@
 import { STREETS } from './types'
 import type { Hand, Player, Street, StreetData } from './types'
-import { orderForStreet } from './players'
 
 /**
  * Betting model: an action's `amount` is the TOTAL a player has committed on
@@ -186,48 +185,22 @@ function respondedToBet(
 }
 
 /**
- * Ordering-based leniency: a player who hasn't matched the bet is still
- * "pending" (silence doesn't yet mean a fold) as long as nobody positioned
- * after them in the street's action order has acted at all. Once someone
- * later has acted, their own window to respond is assumed to have passed.
+ * Whether a player carried over from preflop into the rest of the hand: they
+ * matched the final preflop bet, or are all-in. Preflop is always finished
+ * by the time this is asked (it's only ever used to decide postflop
+ * membership), so no recorded action for a player means they folded — no
+ * benefit of the doubt for silence.
  */
-function turnPending(
-  street: Street,
-  data: StreetData,
-  players: Player[],
-  utgStraddled: boolean,
+export function matchedPreflopBet(
+  hand: Pick<Hand, 'players' | 'stakes' | 'streets'>,
   playerId: string,
 ): boolean {
-  const ordered = orderForStreet(street, players, utgStraddled)
-  const acted = new Set(data.actions.map((a) => a.playerId))
-  let lastActedIdx = -1
-  ordered.forEach((p, i) => {
-    if (acted.has(p.id)) lastActedIdx = i
-  })
-  const playerIdx = ordered.findIndex((p) => p.id === playerId)
-  return playerIdx > lastActedIdx
+  return respondedToBet('preflop', hand.streets.preflop, hand.players, hand.stakes, playerId)
 }
 
 /**
- * Whether a player is still "in" on `street`: they matched its final bet (or
- * are all-in), or their turn to respond to it simply hasn't arrived yet.
- * Being passed over without matching — whether they never acted at all, or
- * acted once but never answered a later raise — means they folded.
- */
-export function stillInStreet(
-  hand: Pick<Hand, 'players' | 'stakes' | 'streets'>,
-  street: Street,
-  player: Player,
-): boolean {
-  const data = hand.streets[street]
-  if (respondedToBet(street, data, hand.players, hand.stakes, player.id)) return true
-  const utgStraddled = (hand.stakes.straddle ?? 0) > 0
-  return turnPending(street, data, hand.players, utgStraddled, player.id)
-}
-
-/**
- * Players eligible to win the pot: never folded, and still in as of preflop
- * (matched the final preflop bet, are all-in, or haven't been passed over yet).
+ * Players eligible to win the pot: never folded, and matched the final
+ * preflop bet (or went all-in) — anyone silent all preflop never called in.
  */
 export function survivors(hand: Pick<Hand, 'players' | 'stakes' | 'streets'>): Player[] {
   const folded = new Set<string>()
@@ -236,7 +209,7 @@ export function survivors(hand: Pick<Hand, 'players' | 'stakes' | 'streets'>): P
       if (a.type === 'fold') folded.add(a.playerId)
     }
   }
-  return hand.players.filter((p) => !folded.has(p.id) && stillInStreet(hand, 'preflop', p))
+  return hand.players.filter((p) => !folded.has(p.id) && matchedPreflopBet(hand, p.id))
 }
 
 /**
