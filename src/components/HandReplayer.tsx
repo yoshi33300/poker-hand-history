@@ -6,8 +6,7 @@ import { formatBB } from '../bb'
 import { blindBaseline } from '../pot'
 import { formatPosition, orderForStreet } from '../players'
 import { buildHandText } from '../shareText'
-// AIレビューを有効化する場合はこの import と下部の <AiReview hand={hand} /> を戻す
-// import AiReview from './AiReview'
+import AiReview from './AiReview'
 import PokerTable from './PokerTable'
 import type { TableState } from './PokerTable'
 
@@ -92,15 +91,15 @@ function computeState(hand: Hand, events: TimelineEvent[], index: number): Table
   }
 }
 
-// Step-by-step navigation stops at actions only — street headers and board
-// reveals aren't worth an extra click, so they ride along with the next
-// action. A trailing stop is added when a street's board was recorded with
-// no further action (e.g. everyone ran it out after an earlier all-in), so
-// that final board still gets shown once at the end of the timeline.
+// Step-by-step navigation stops at boards and actions — a street header
+// alone isn't worth its own click, so it rides along with whichever comes
+// next (the board it precedes, or the first action if there's no board).
+// A trailing stop is added as a safety net for any leftover event after the
+// last board/action (shouldn't normally happen, but keeps the end reachable).
 function buildStops(events: TimelineEvent[]): number[] {
   const stops: number[] = []
   events.forEach((e, i) => {
-    if (e.kind === 'action') stops.push(i + 1)
+    if (e.kind === 'action' || e.kind === 'board') stops.push(i + 1)
   })
   if (events.length > 0 && stops[stops.length - 1] !== events.length) {
     stops.push(events.length)
@@ -364,7 +363,7 @@ export default function HandReplayer({ hand, onBack, onEdit }: HandReplayerProps
         </div>
       )}
 
-      {/* <AiReview hand={hand} /> */}
+      <AiReview hand={hand} />
     </div>
   )
 }

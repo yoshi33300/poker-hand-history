@@ -9,6 +9,13 @@ import CardPicker from './CardPicker'
 
 const AMOUNT_TYPES: ActionType[] = ['call', 'bet', 'raise', 'allin']
 
+// Quick pot-relative sizing shortcuts, shown for a postflop opening bet.
+const BET_POT_PRESETS = [33, 50, 75, 100, 125]
+
+// Quick multiplier shortcuts for a preflop raise, relative to the current
+// bet (the big blind/straddle for an open, or the last raise for a 3bet+).
+const RAISE_MULTIPLIERS = [2, 2.5, 3, 3.5, 4, 5]
+
 /** Which actions make sense given whether this player is facing a bet. */
 function availableActions(facingBet: boolean, canAllin: boolean): ActionType[] {
   const base: ActionType[] = facingBet ? ['fold', 'call', 'raise'] : ['check', 'bet']
@@ -61,6 +68,12 @@ export default function StreetEditor({
   const remainingStack = streetStartStack - investedSoFar
   const actions = availableActions(betTo > investedSoFar, remainingStack > 0)
   const bettingClosed = isStreetComplete(street, data, players, stakes)
+
+  // Pot-relative sizing shortcuts only make sense for a postflop opening bet
+  // (preflop opens are sized in BB multiples, not pot %).
+  const potForSizing = potBefore + contribution.total
+  const showBetPresets = street !== 'preflop' && actionType === 'bet'
+  const showRaisePresets = street === 'preflop' && actionType === 'raise' && betTo > 0
 
   // Calling always means "match the current bet" and an all-in commits the
   // whole stack — prefill both so nobody has to do the mental math.
@@ -180,6 +193,42 @@ export default function StreetEditor({
               ))}
             </div>
           </div>
+          {showBetPresets && (
+            <div className="bet-preset-buttons" role="group" aria-label="ベットサイズのプリセット">
+              {BET_POT_PRESETS.map((pct) => {
+                const presetAmount = Math.max(1, Math.round((potForSizing * pct) / 100))
+                return (
+                  <button
+                    type="button"
+                    key={pct}
+                    className={`bet-preset-button ${amount === String(presetAmount) ? 'selected' : ''}`}
+                    disabled={presetAmount > remainingStack}
+                    onClick={() => setAmount(String(presetAmount))}
+                  >
+                    {pct}%
+                  </button>
+                )
+              })}
+            </div>
+          )}
+          {showRaisePresets && (
+            <div className="bet-preset-buttons" role="group" aria-label="レイズサイズのプリセット">
+              {RAISE_MULTIPLIERS.map((mult) => {
+                const presetAmount = Math.round(betTo * mult * 100) / 100
+                return (
+                  <button
+                    type="button"
+                    key={mult}
+                    className={`bet-preset-button ${amount === String(presetAmount) ? 'selected' : ''}`}
+                    disabled={presetAmount > remainingStack}
+                    onClick={() => setAmount(String(presetAmount))}
+                  >
+                    ×{mult}
+                  </button>
+                )
+              })}
+            </div>
+          )}
           <div className="action-add-row">
             {AMOUNT_TYPES.includes(actionType) && (
               <label className="action-amount-label">
