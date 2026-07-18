@@ -171,15 +171,10 @@ export default function HandForm({ hand, onSaved, onCancel }: HandFormProps) {
 
   function autoTitle(): string {
     if (!hero) return '無題のハンド'
-    const folded = new Set<string>()
-    const acted = new Set<string>()
-    for (const street of STREETS) {
-      for (const action of streets[street].actions) {
-        acted.add(action.playerId)
-        if (action.type === 'fold') folded.add(action.playerId)
-      }
-    }
-    const opponents = players.filter((p) => p.id !== hero.id && acted.has(p.id) && !folded.has(p.id))
+    // survivorsAtEnd already excludes anyone who folded outright or never
+    // matched the final preflop bet — the same "implicit fold" a player who
+    // raised but got silently skipped after a later re-raise falls into.
+    const opponents = survivorsAtEnd.filter((p) => p.id !== hero.id)
     const potType = preflopPotType(handSnapshot)
     if (opponents.length > 0) {
       const matchup = [hero.position, ...opponents.map((p) => p.position)].join('vs')

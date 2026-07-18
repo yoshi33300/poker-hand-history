@@ -1,5 +1,5 @@
 import { ACTION_LABELS, STREETS, STREET_LABELS } from './types'
-import type { ActionType, Hand, HandAction } from './types'
+import type { ActionType, Hand, HandAction, Street } from './types'
 import { formatCard } from './cards'
 import { effectiveStack, potBeforeStreet } from './pot'
 import { formatPosition, withImplicitPreflopFolds } from './players'
@@ -14,9 +14,35 @@ function positionOf(hand: Hand, playerId: string): string {
   return p ? formatPosition(p.position, hand.stakes.straddle) : '?'
 }
 
-function describeAction(hand: Hand, a: HandAction): string {
-  const amount = AMOUNT_SHOWN.includes(a.type) && a.amount ? ` ${formatBB(a.amount, hand.stakes.bb)}` : ''
-  return `${positionOf(hand, a.playerId)} ${ACTION_LABELS[a.type]}${amount}`
+// Pad every position label to the widest one at the table so the action
+// column lines up (e.g. "UTG+1" vs "BB") when pasted in a monospace font.
+function positionColumnWidth(hand: Hand): number {
+  return Math.max(...hand.players.map((p) => formatPosition(p.position, hand.stakes.straddle).length))
+}
+
+// A known opponent hand is noted once, at the end of that player's last
+// action in the whole hand (whether that's a real action or an implicit
+// fold) — not repeated on every earlier line of theirs.
+function cardsSuffix(hand: Hand, playerId: string): string {
+  const cards = hand.villainCards?.[playerId]
+  return cards && cards.length > 0 ? ` (${cards.map(formatCard).join('')})` : ''
+}
+
+type ShareEntry = { street: Street; playerId: string } & (
+  | { kind: 'action'; action: HandAction }
+  | { kind: 'implicit-fold' }
+)
+
+function renderEntry(hand: Hand, entry: ShareEntry, posWidth: number, showCards: boolean): string {
+  const cards = showCards ? cardsSuffix(hand, entry.playerId) : ''
+  if (entry.kind === 'implicit-fold') {
+    return `${positionOf(hand, entry.playerId).padEnd(posWidth)} ${ACTION_LABELS.fold}${cards}`
+  }
+  const amount =
+    AMOUNT_SHOWN.includes(entry.action.type) && entry.action.amount
+      ? ` ${formatBB(entry.action.amount, hand.stakes.bb)}`
+      : ''
+  return `${positionOf(hand, entry.playerId).padEnd(posWidth)} ${ACTION_LABELS[entry.action.type]}${amount}${cards}`
 }
 
 /** Compact, chat-friendly hand history text. */
@@ -26,7 +52,6 @@ export function buildHandText(hand: Hand): string {
   const holeCards = hand.heroHoleCards.map(formatCard).join('')
 
   const lines: string[] = []
-  lines.push(`HERO　${heroPos}　${holeCards}`.trim())
   const eff = effectiveStack(hand)
   const effText = Number.isFinite(eff) ? ` eff ${formatBB(eff, hand.stakes.bb)}` : ''
   const anteText =
@@ -35,6 +60,7 @@ export function buildHandText(hand: Hand): string {
   lines.push(
     `${hand.stakes.currency}${hand.stakes.sb}/${hand.stakes.currency}${hand.stakes.bb}${anteText}${straddleText}　${hand.gameType}${effText}`,
   )
+  lines.push(`HERO　${heroPos}　${holeCards}`.trim())
   lines.push('')
 
   // Preflop is expanded with synthetic fold lines for anyone the action
@@ -55,16 +81,31 @@ export function buildHandText(hand: Hand): string {
     return !(isFold && (preflopEventCount.get(pid) ?? 0) === 1)
   })
 
+  // Flatten every visible preflop/postflop event into one hand-wide sequence
+  // so a known opponent hand can be pinned to that player's very last
+  // appearance, wherever in the hand that ends up being.
+  const entries: ShareEntry[] = [
+    ...visiblePreflopEvents.map((ev): ShareEntry =>
+      ev.kind === 'action'
+        ? { street: 'preflop', playerId: ev.action.playerId, kind: 'action', action: ev.action }
+        : { street: 'preflop', playerId: ev.playerId, kind: 'implicit-fold' },
+    ),
+    ...(['flop', 'turn', 'river'] as const).flatMap((street) =>
+      hand.streets[street].actions.map(
+        (action): ShareEntry => ({ street, playerId: action.playerId, kind: 'action', action }),
+      ),
+    ),
+  ]
+  const lastEntryIndexByPlayer = new Map<string, number>()
+  entries.forEach((e, i) => lastEntryIndexByPlayer.set(e.playerId, i))
+
+  const posWidth = positionColumnWidth(hand)
   for (const street of STREETS) {
     const data = hand.streets[street]
-    const streetLines =
-      street === 'preflop'
-        ? visiblePreflopEvents.map((ev) =>
-            ev.kind === 'action'
-              ? describeAction(hand, ev.action)
-              : `${positionOf(hand, ev.playerId)} ${ACTION_LABELS.fold}`,
-          )
-        : data.actions.map((a) => describeAction(hand, a))
+    const streetLines = entries
+      .map((e, i) => ({ e, i }))
+      .filter(({ e }) => e.street === street)
+      .map(({ e, i }) => renderEntry(hand, e, posWidth, lastEntryIndexByPlayer.get(e.playerId) === i))
     if (streetLines.length === 0 && data.board.length === 0) continue
     const boardText = data.board.length > 0 ? ` ${data.board.map(formatCard).join('')}` : ''
     const potChips = potBeforeStreet(hand, street)
