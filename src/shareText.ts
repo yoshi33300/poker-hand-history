@@ -2,8 +2,15 @@ import { ACTION_LABELS, STREETS, STREET_LABELS } from './types'
 import type { ActionType, Hand, HandAction, Street } from './types'
 import { formatCard } from './cards'
 import { effectiveStack, potBeforeStreet } from './pot'
-import { formatPosition, withImplicitPreflopFolds } from './players'
+import { activePlayers, formatPosition, withImplicitStreetEvents } from './players'
+import type { ImplicitStreetEvent } from './players'
 import { formatBB } from './bb'
+
+function isNotImplicitCheck(
+  ev: ImplicitStreetEvent,
+): ev is Exclude<ImplicitStreetEvent, { kind: 'implicit-check' }> {
+  return ev.kind !== 'implicit-check'
+}
 
 // Amounts are shown only where they carry information (bet/raise/all-in sizes);
 // a call always matches the current bet, so "Call" alone reads fine.
@@ -14,10 +21,25 @@ function positionOf(hand: Hand, playerId: string): string {
   return p ? formatPosition(p.position, hand.stakes.straddle) : '?'
 }
 
-// Pad every position label to the widest one at the table so the action
-// column lines up (e.g. "UTG+1" vs "BB") when pasted in a monospace font.
-function positionColumnWidth(hand: Hand): number {
-  return Math.max(...hand.players.map((p) => formatPosition(p.position, hand.stakes.straddle).length))
+// Chat apps render pasted text in proportional fonts, so real column
+// alignment is impossible — approximate it instead. Narrow glyphs (I, J,
+// parentheses) count as half a letter, and each missing width unit versus
+// the widest label at the table is padded with two half-width spaces
+// (roughly one uppercase letter in common UI fonts).
+function labelWidthUnits(label: string): number {
+  let units = 0
+  for (const ch of label) units += 'IJij()'.includes(ch) ? 0.5 : 1
+  return units
+}
+
+function maxPositionUnits(hand: Hand): number {
+  return Math.max(...hand.players.map((p) => labelWidthUnits(formatPosition(p.position, hand.stakes.straddle))))
+}
+
+function paddedPosition(hand: Hand, playerId: string, maxUnits: number): string {
+  const label = positionOf(hand, playerId)
+  const pad = Math.max(0, Math.round((maxUnits - labelWidthUnits(label)) * 2))
+  return label + ' '.repeat(pad)
 }
 
 // A known opponent hand is noted once, at the end of that player's last
@@ -33,16 +55,17 @@ type ShareEntry = { street: Street; playerId: string } & (
   | { kind: 'implicit-fold' }
 )
 
-function renderEntry(hand: Hand, entry: ShareEntry, posWidth: number, showCards: boolean): string {
+function renderEntry(hand: Hand, entry: ShareEntry, maxUnits: number, showCards: boolean): string {
+  const pos = paddedPosition(hand, entry.playerId, maxUnits)
   const cards = showCards ? cardsSuffix(hand, entry.playerId) : ''
   if (entry.kind === 'implicit-fold') {
-    return `${positionOf(hand, entry.playerId).padEnd(posWidth)} ${ACTION_LABELS.fold}${cards}`
+    return `${pos}　${ACTION_LABELS.fold}${cards}`
   }
   const amount =
     AMOUNT_SHOWN.includes(entry.action.type) && entry.action.amount
       ? ` ${formatBB(entry.action.amount, hand.stakes.bb)}`
       : ''
-  return `${positionOf(hand, entry.playerId).padEnd(posWidth)} ${ACTION_LABELS[entry.action.type]}${amount}${cards}`
+  return `${pos}　${ACTION_LABELS[entry.action.type]}${amount}${cards}`
 }
 
 /** Compact, chat-friendly hand history text. */
@@ -63,13 +86,25 @@ export function buildHandText(hand: Hand): string {
   lines.push(`HERO　${heroPos}　${holeCards}`.trim())
   lines.push('')
 
-  // Preflop is expanded with synthetic fold lines for anyone the action
-  // order silently skipped (e.g. a limper who never gets revisited after a
-  // later re-raise) — otherwise a raise they made earlier would look like
-  // they were still live. Folds from players who did nothing else are noise
-  // and dropped — everyone not mentioned obviously folded outright.
+  // Every street is expanded with synthetic fold lines for anyone the action
+  // order silently skipped: preflop always requires responding to the
+  // blinds, so a skip there is always a fold; postflop, a skip only counts
+  // as a fold once a bet is actually out (checking around without every
+  // check recorded is normal and stays silent). Preflop folds from players
+  // who did nothing else are noise and dropped — everyone not mentioned
+  // obviously folded outright; a postflop implicit fold is always shown,
+  // since that player already mattered enough to survive preflop.
   const utgStraddled = (hand.stakes.straddle ?? 0) > 0
-  const preflopEvents = withImplicitPreflopFolds(hand.players, hand.streets.preflop.actions, utgStraddled)
+  // Preflop always starts with a bet (the blinds), so this never actually
+  // produces an implicit-check event — filtered out only to satisfy the type.
+  const preflopEvents = withImplicitStreetEvents(
+    hand.players,
+    hand.streets.preflop.actions,
+    'preflop',
+    utgStraddled,
+    true,
+    true,
+  ).filter(isNotImplicitCheck)
   const preflopEventCount = new Map<string, number>()
   for (const ev of preflopEvents) {
     const pid = ev.kind === 'action' ? ev.action.playerId : ev.playerId
@@ -81,31 +116,36 @@ export function buildHandText(hand: Hand): string {
     return !(isFold && (preflopEventCount.get(pid) ?? 0) === 1)
   })
 
-  // Flatten every visible preflop/postflop event into one hand-wide sequence
-  // so a known opponent hand can be pinned to that player's very last
-  // appearance, wherever in the hand that ends up being.
+  // Flatten every visible event, across every street, into one hand-wide
+  // sequence so a known opponent hand can be pinned to that player's very
+  // last appearance, wherever in the hand that ends up being.
   const entries: ShareEntry[] = [
     ...visiblePreflopEvents.map((ev): ShareEntry =>
       ev.kind === 'action'
         ? { street: 'preflop', playerId: ev.action.playerId, kind: 'action', action: ev.action }
         : { street: 'preflop', playerId: ev.playerId, kind: 'implicit-fold' },
     ),
-    ...(['flop', 'turn', 'river'] as const).flatMap((street) =>
-      hand.streets[street].actions.map(
-        (action): ShareEntry => ({ street, playerId: action.playerId, kind: 'action', action }),
-      ),
-    ),
+    ...(['flop', 'turn', 'river'] as const).flatMap((street) => {
+      const activeThisStreet = activePlayers(hand, STREETS[STREETS.indexOf(street) - 1])
+      return withImplicitStreetEvents(activeThisStreet, hand.streets[street].actions, street, utgStraddled, false, true)
+        .filter(isNotImplicitCheck)
+        .map((ev): ShareEntry =>
+          ev.kind === 'action'
+            ? { street, playerId: ev.action.playerId, kind: 'action', action: ev.action }
+            : { street, playerId: ev.playerId, kind: 'implicit-fold' },
+        )
+    }),
   ]
   const lastEntryIndexByPlayer = new Map<string, number>()
   entries.forEach((e, i) => lastEntryIndexByPlayer.set(e.playerId, i))
 
-  const posWidth = positionColumnWidth(hand)
+  const maxUnits = maxPositionUnits(hand)
   for (const street of STREETS) {
     const data = hand.streets[street]
     const streetLines = entries
       .map((e, i) => ({ e, i }))
       .filter(({ e }) => e.street === street)
-      .map(({ e, i }) => renderEntry(hand, e, posWidth, lastEntryIndexByPlayer.get(e.playerId) === i))
+      .map(({ e, i }) => renderEntry(hand, e, maxUnits, lastEntryIndexByPlayer.get(e.playerId) === i))
     if (streetLines.length === 0 && data.board.length === 0) continue
     const boardText = data.board.length > 0 ? ` ${data.board.map(formatCard).join('')}` : ''
     const potChips = potBeforeStreet(hand, street)

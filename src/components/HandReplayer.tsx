@@ -3,8 +3,8 @@ import { ACTION_LABELS, STREET_LABELS, STREETS } from '../types'
 import type { CardCode, Hand, HandAction, Street } from '../types'
 import { formatCard } from '../cards'
 import { formatBB } from '../bb'
-import { blindBaseline, matchedPreflopBet } from '../pot'
-import { formatPosition, withImplicitPreflopFolds } from '../players'
+import { blindBaseline, stackBeforeStreet } from '../pot'
+import { activePlayers, formatPosition, withImplicitStreetEvents } from '../players'
 import { buildHandText } from '../shareText'
 // AIレビューを有効化する場合はこの import と下部の <AiReview hand={hand} /> を戻す
 // import AiReview from './AiReview'
@@ -25,13 +25,38 @@ interface HandReplayerProps {
 // Blinds/antes are chips already on the table before anyone acts, so they are
 // not separate advanceable steps — computeState() seeds them directly.
 function buildTimeline(hand: Hand): TimelineEvent[] {
+  const utgStraddled = (hand.stakes.straddle ?? 0) > 0
   const events: TimelineEvent[] = []
   for (const street of STREETS) {
     const data = hand.streets[street]
-    if (data.actions.length === 0 && data.board.length === 0) continue
+    let actions = data.actions
+    // A postflop street that was reached but has gaps in its records replays
+    // them explicitly: anyone still in — and still holding chips, so an
+    // earlier all-in runout stays silent — with nothing recorded is shown
+    // checking while no bet is out, and folding once one is, so a silent
+    // street reads check-check and silence facing a bet reads as the fold it
+    // was. (Preflop keeps its folds off the timeline — most seats fold every
+    // hand, and the dimmed seats already tell that story.)
+    if (street !== 'preflop' && (data.board.length > 0 || data.actions.length > 0)) {
+      const pool = activePlayers(hand, STREETS[STREETS.indexOf(street) - 1]).filter(
+        (p) => stackBeforeStreet(hand, street, p.id) > 0,
+      )
+      if (pool.length >= 2) {
+        actions = withImplicitStreetEvents(pool, data.actions, street, utgStraddled, false, true).map((ev) =>
+          ev.kind === 'action'
+            ? ev.action
+            : {
+                id: `${ev.kind}-${street}-${ev.playerId}`,
+                playerId: ev.playerId,
+                type: ev.kind === 'implicit-check' ? ('check' as const) : ('fold' as const),
+              },
+        )
+      }
+    }
+    if (actions.length === 0 && data.board.length === 0) continue
     events.push({ kind: 'street-start', street })
     if (data.board.length > 0) events.push({ kind: 'board', street, cards: data.board })
-    for (const action of data.actions) {
+    for (const action of actions) {
       events.push({ kind: 'action', street, action })
     }
   }
@@ -180,33 +205,49 @@ export default function HandReplayer({ hand, onBack, onEdit }: HandReplayerProps
   const previousIndex = step > 1 ? stops[step - 2] : 0
   const currentBundle = currentIndex > 0 ? events.slice(previousIndex, currentIndex) : []
 
-  // Players passed over during preflop so far — dimmed like an explicit
-  // fold. Only matters before the flop; once reached, these players simply
-  // drop off the table via visibleIds below instead.
+  // Players eligible to still be on the table for the current street: anyone
+  // who survived every street strictly before it (implicit folds included —
+  // preflop always requires responding to the blinds, postflop only counts
+  // silence as a fold once a bet is actually out).
+  const eligibleForCurrentStreet = useMemo(() => {
+    const streetIndex = STREETS.indexOf(state.street)
+    return streetIndex > 0 ? activePlayers(hand, STREETS[streetIndex - 1]) : hand.players
+  }, [state.street, hand])
+
+  // Players passed over on the current street so far — dimmed like an
+  // explicit fold. Once the street ends, they simply drop off the table via
+  // visibleIds below instead.
   const implicitFoldedIds = useMemo(() => {
-    if (state.street !== 'preflop') return new Set<string>()
     const utgStraddled = (hand.stakes.straddle ?? 0) > 0
-    const preflopActionsSoFar = events
+    const actionsSoFar = events
       .slice(0, currentIndex)
-      .filter((e): e is Extract<TimelineEvent, { kind: 'action' }> => e.kind === 'action' && e.street === 'preflop')
+      .filter((e): e is Extract<TimelineEvent, { kind: 'action' }> => e.kind === 'action' && e.street === state.street)
       .map((e) => e.action)
+    // The replay is of an already-saved, finished hand, so once every
+    // timeline action for this street (synthesized checks included) has been
+    // revealed there's nothing left to wait for — an uncalled bet at that
+    // point really did fold everyone who never answered it. Mid-street, more
+    // of the street's own actions still exist further along, so silence
+    // doesn't mean anything yet.
+    const streetActionTotal = events.filter(
+      (e) => e.kind === 'action' && e.street === state.street,
+    ).length
+    const flushAtEnd = actionsSoFar.length === streetActionTotal
     const result = new Set<string>()
-    for (const ev of withImplicitPreflopFolds(hand.players, preflopActionsSoFar, utgStraddled)) {
+    for (const ev of withImplicitStreetEvents(
+      eligibleForCurrentStreet,
+      actionsSoFar,
+      state.street,
+      utgStraddled,
+      state.street === 'preflop',
+      flushAtEnd,
+    )) {
       if (ev.kind === 'implicit-fold') result.add(ev.playerId)
     }
     return result
-  }, [state.street, currentIndex, events, hand])
+  }, [state.street, currentIndex, events, hand, eligibleForCurrentStreet])
 
-  // Postflop, a player only stays on the table if they actually matched the
-  // final preflop bet (or went all-in) — merely having acted at some point
-  // isn't enough, since an earlier raiser who got 4bet and never responded
-  // folded just as surely as someone who never acted at all.
-  const reachedPostflop = state.street !== 'preflop'
-  const visibleIds = new Set(
-    hand.players
-      .filter((p) => !reachedPostflop || matchedPreflopBet(hand, p.id))
-      .map((p) => p.id),
-  )
+  const visibleIds = new Set(eligibleForCurrentStreet.map((p) => p.id))
 
   function positionOf(id: string) {
     const p = hand.players.find((p) => p.id === id)

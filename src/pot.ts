@@ -1,5 +1,6 @@
 import { STREETS } from './types'
 import type { Hand, Player, Street, StreetData } from './types'
+import { activePlayers } from './players'
 
 /**
  * Betting model: an action's `amount` is the TOTAL a player has committed on
@@ -163,53 +164,12 @@ export function totalContribution(
 }
 
 /**
- * Whether a player's contribution on `street` matches (or exceeds) that
- * street's final bet — i.e. they called/raised to it — or they're all-in for
- * less. A stale contribution from *before* a later raise doesn't count: only
- * their most recent standing (which streetContribution already reflects)
- * matters, so someone who acted once but never answered a subsequent raise
- * reads the same as someone who never acted at all.
- */
-function respondedToBet(
-  street: Street,
-  data: StreetData,
-  players: Player[],
-  stakes: Hand['stakes'],
-  playerId: string,
-): boolean {
-  const contribution = streetContribution(street, data, players, stakes)
-  const betTo = currentBetTo(contribution)
-  const mine = contribution.perPlayer[playerId] ?? 0
-  if (mine >= betTo) return true
-  return data.actions.some((a) => a.playerId === playerId && a.type === 'allin')
-}
-
-/**
- * Whether a player carried over from preflop into the rest of the hand: they
- * matched the final preflop bet, or are all-in. Preflop is always finished
- * by the time this is asked (it's only ever used to decide postflop
- * membership), so no recorded action for a player means they folded — no
- * benefit of the doubt for silence.
- */
-export function matchedPreflopBet(
-  hand: Pick<Hand, 'players' | 'stakes' | 'streets'>,
-  playerId: string,
-): boolean {
-  return respondedToBet('preflop', hand.streets.preflop, hand.players, hand.stakes, playerId)
-}
-
-/**
- * Players eligible to win the pot: never folded, and matched the final
- * preflop bet (or went all-in) — anyone silent all preflop never called in.
+ * Players eligible to win the pot: still active after every street's
+ * recorded (and implicit) folds — silence after a bet folds, same as an
+ * explicit fold; silence before one is just checking around.
  */
 export function survivors(hand: Pick<Hand, 'players' | 'stakes' | 'streets'>): Player[] {
-  const folded = new Set<string>()
-  for (const street of STREETS) {
-    for (const a of hand.streets[street].actions) {
-      if (a.type === 'fold') folded.add(a.playerId)
-    }
-  }
-  return hand.players.filter((p) => !folded.has(p.id) && matchedPreflopBet(hand, p.id))
+  return activePlayers(hand)
 }
 
 /**

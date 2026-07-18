@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { createId } from '../id'
-import { createDefaultPlayers, formatPosition, orderForStreet } from '../players'
+import { activePlayers, createDefaultPlayers, formatPosition, orderForStreet } from '../players'
 import { saveHand } from '../db'
-import { heroNetAmount, matchedPreflopBet, potBeforeStreet, preflopPotType, stackBeforeStreet, survivors } from '../pot'
+import { heroNetAmount, potBeforeStreet, preflopPotType, stackBeforeStreet, survivors } from '../pot'
 import { determineShowdownWinners } from '../handRank'
 import { formatBB } from '../bb'
 import { STREETS } from '../types'
@@ -125,18 +125,12 @@ export default function HandForm({ hand, onSaved, onCancel }: HandFormProps) {
       })
       return ordered.filter((p, i) => acted.has(p.id) || i > lastActedIdx)
     }
-    // Postflop: preflop is settled by now, so a player carries over only if
-    // they matched the final preflop bet (or are all-in) — a stale call from
-    // before a later raise doesn't count, same as never having acted at all.
-    const folded = new Set<string>()
-    for (let i = 0; i < streetIndex; i++) {
-      for (const a of streets[STREETS[i]].actions) {
-        if (a.type === 'fold') folded.add(a.playerId)
-      }
-    }
-    const list = players.filter(
-      (p) => !folded.has(p.id) && matchedPreflopBet(handSnapshot, p.id),
-    )
+    // Postflop: every street strictly before this one is settled by now, so
+    // a player carries over only if they survived all of them — matched
+    // each street's final bet (or went all-in), where silence before a bet
+    // is just checking around but silence after one folds, same as never
+    // having acted at all.
+    const list = activePlayers(handSnapshot, STREETS[streetIndex - 1])
     return orderForStreet(street, list, utgStraddled)
   }
 
