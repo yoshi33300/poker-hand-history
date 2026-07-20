@@ -75,6 +75,16 @@ export default function StreetEditor({
   const showBetPresets = street !== 'preflop' && actionType === 'bet'
   const showRaisePresets = street === 'preflop' && actionType === 'raise' && betTo > 0
 
+  // Until someone actually raises, betTo is just the blind baseline — which
+  // includes the ante when the BB posts it for the table, inflating an
+  // "open to 2.5x" preset well past 2.5 actual big blinds. Raise multipliers
+  // are always described in pure BB (or straddle) terms, so the open uses
+  // that instead; once a real raise exists, betTo already reflects a plain
+  // chip total the player typed in and is fine to multiply directly.
+  const hasPreflopRaise = data.actions.some((a) => a.type === 'bet' || a.type === 'raise' || a.type === 'allin')
+  const raiseSizingBase =
+    street === 'preflop' && !hasPreflopRaise ? ((stakes.straddle ?? 0) > 0 ? stakes.straddle! : stakes.bb) : betTo
+
   // Calling always means "match the current bet" and an all-in commits the
   // whole stack — prefill both so nobody has to do the mental math.
   useEffect(() => {
@@ -214,7 +224,7 @@ export default function StreetEditor({
           {showRaisePresets && (
             <div className="bet-preset-buttons" role="group" aria-label="レイズサイズのプリセット">
               {RAISE_MULTIPLIERS.map((mult) => {
-                const presetAmount = Math.round(betTo * mult * 100) / 100
+                const presetAmount = Math.round(raiseSizingBase * mult * 100) / 100
                 return (
                   <button
                     type="button"
