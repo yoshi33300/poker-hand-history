@@ -42,30 +42,21 @@ function paddedPosition(hand: Hand, playerId: string, maxUnits: number): string 
   return label + ' '.repeat(pad)
 }
 
-// A known opponent hand is noted once, at the end of that player's last
-// action in the whole hand (whether that's a real action or an implicit
-// fold) — not repeated on every earlier line of theirs.
-function cardsSuffix(hand: Hand, playerId: string): string {
-  const cards = hand.villainCards?.[playerId]
-  return cards && cards.length > 0 ? ` (${cards.map(formatCard).join('')})` : ''
-}
-
 type ShareEntry = { street: Street; playerId: string } & (
   | { kind: 'action'; action: HandAction }
   | { kind: 'implicit-fold' }
 )
 
-function renderEntry(hand: Hand, entry: ShareEntry, maxUnits: number, showCards: boolean): string {
+function renderEntry(hand: Hand, entry: ShareEntry, maxUnits: number): string {
   const pos = paddedPosition(hand, entry.playerId, maxUnits)
-  const cards = showCards ? cardsSuffix(hand, entry.playerId) : ''
   if (entry.kind === 'implicit-fold') {
-    return `${pos}　${ACTION_LABELS.fold}${cards}`
+    return `${pos} ${ACTION_LABELS.fold}`
   }
   const amount =
     AMOUNT_SHOWN.includes(entry.action.type) && entry.action.amount
       ? ` ${formatBB(entry.action.amount, hand.stakes.bb)}`
       : ''
-  return `${pos}　${ACTION_LABELS[entry.action.type]}${amount}${cards}`
+  return `${pos} ${ACTION_LABELS[entry.action.type]}${amount}`
 }
 
 /** Compact, chat-friendly hand history text. */
@@ -117,8 +108,7 @@ export function buildHandText(hand: Hand): string {
   })
 
   // Flatten every visible event, across every street, into one hand-wide
-  // sequence so a known opponent hand can be pinned to that player's very
-  // last appearance, wherever in the hand that ends up being.
+  // sequence rendered street by street below.
   const entries: ShareEntry[] = [
     ...visiblePreflopEvents.map((ev): ShareEntry =>
       ev.kind === 'action'
@@ -136,16 +126,12 @@ export function buildHandText(hand: Hand): string {
         )
     }),
   ]
-  const lastEntryIndexByPlayer = new Map<string, number>()
-  entries.forEach((e, i) => lastEntryIndexByPlayer.set(e.playerId, i))
-
   const maxUnits = maxPositionUnits(hand)
   for (const street of STREETS) {
     const data = hand.streets[street]
     const streetLines = entries
-      .map((e, i) => ({ e, i }))
-      .filter(({ e }) => e.street === street)
-      .map(({ e, i }) => renderEntry(hand, e, maxUnits, lastEntryIndexByPlayer.get(e.playerId) === i))
+      .filter((e) => e.street === street)
+      .map((e) => renderEntry(hand, e, maxUnits))
     if (streetLines.length === 0 && data.board.length === 0) continue
     const boardText = data.board.length > 0 ? ` ${data.board.map(formatCard).join('')}` : ''
     const potChips = potBeforeStreet(hand, street)
@@ -155,13 +141,15 @@ export function buildHandText(hand: Hand): string {
     lines.push('')
   }
 
-  const winners = hand.result.winnerIds ?? []
-  if (winners.length > 0) {
-    const net = hand.result.netAmount
-    const sign = net > 0 ? '+' : ''
-    lines.push(
-      `勝者: ${winners.map((id) => positionOf(hand, id)).join(', ')} / ${sign}${formatBB(net, hand.stakes.bb)}`,
-    )
+  // Known opponent hands come after all the action, on their own lines,
+  // so the history itself stays spoiler-free until the end.
+  const shownVillains = hand.players.filter((p) => (hand.villainCards?.[p.id]?.length ?? 0) > 0)
+  if (shownVillains.length > 0) {
+    for (const p of shownVillains) {
+      lines.push(
+        `${formatPosition(p.position, hand.stakes.straddle)} ${hand.villainCards![p.id].map(formatCard).join('')}`,
+      )
+    }
     lines.push('')
   }
 
