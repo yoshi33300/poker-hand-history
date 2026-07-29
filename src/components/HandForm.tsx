@@ -164,11 +164,12 @@ export default function HandForm({ hand, onSaved, onCancel }: HandFormProps) {
   }
 
   function autoTitle(): string {
-    if (!hero) return '無題のハンド'
-    // survivorsAtEnd already excludes anyone who folded outright or never
-    // matched the final preflop bet — the same "implicit fold" a player who
-    // raised but got silently skipped after a later re-raise falls into.
-    const opponents = survivorsAtEnd.filter((p) => p.id !== hero.id)
+    // Nothing recorded yet — there's no matchup to name, so stay blank.
+    if (!hero || !hasAnyAction) return ''
+    // The title names everyone who made it past preflop, even players who
+    // fold later in the hand — "who saw the flop together" is the matchup.
+    // A hand that never left preflop falls back to hero's own line.
+    const opponents = activePlayers(handSnapshot, 'preflop').filter((p) => p.id !== hero.id)
     const potType = preflopPotType(handSnapshot)
     if (opponents.length > 0) {
       const matchup = [hero.position, ...opponents.map((p) => p.position)].join('vs')
@@ -200,7 +201,9 @@ export default function HandForm({ hand, onSaved, onCancel }: HandFormProps) {
     const savedHand: Hand = {
       id: hand?.id ?? createId(),
       createdAt: hand?.createdAt ?? Date.now(),
-      title: title.trim() || autoTitle(),
+      // The auto title is blank until any action exists; a hand saved that
+      // early still needs some name for the list.
+      title: title.trim() || autoTitle() || '無題のハンド',
       gameType,
       stakes,
       players,

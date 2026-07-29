@@ -1,7 +1,7 @@
 import { ACTION_LABELS, STREETS, STREET_LABELS } from './types'
 import type { ActionType, Hand, HandAction, Street } from './types'
 import { formatCard } from './cards'
-import { effectiveStack, potBeforeStreet } from './pot'
+import { effectiveStack, potBeforeStreet, stackBeforeStreet } from './pot'
 import { activePlayers, formatPosition, withImplicitStreetEvents } from './players'
 import type { ImplicitStreetEvent } from './players'
 import { formatBB } from './bb'
@@ -77,14 +77,14 @@ export function buildHandText(hand: Hand): string {
   lines.push(`HERO　${heroPos}　${holeCards}`.trim())
   lines.push('')
 
-  // Every street is expanded with synthetic fold lines for anyone the action
+  // Every street is expanded with synthetic lines for anyone the action
   // order silently skipped: preflop always requires responding to the
-  // blinds, so a skip there is always a fold; postflop, a skip only counts
-  // as a fold once a bet is actually out (checking around without every
-  // check recorded is normal and stays silent). Preflop folds from players
-  // who did nothing else are noise and dropped — everyone not mentioned
-  // obviously folded outright; a postflop implicit fold is always shown,
-  // since that player already mattered enough to survive preflop.
+  // blinds, so a skip there is always a fold; postflop, a skip reads as a
+  // check while no bet is out and as a fold once one is. Preflop folds from
+  // players who did nothing else are noise and dropped — everyone not
+  // mentioned obviously folded outright; postflop synthetic lines are
+  // always shown, since those players already mattered enough to survive
+  // preflop.
   const utgStraddled = (hand.stakes.straddle ?? 0) > 0
   // Preflop always starts with a bet (the blinds), so this never actually
   // produces an implicit-check event — filtered out only to satisfy the type.
@@ -115,15 +115,31 @@ export function buildHandText(hand: Hand): string {
         ? { street: 'preflop', playerId: ev.action.playerId, kind: 'action', action: ev.action }
         : { street: 'preflop', playerId: ev.playerId, kind: 'implicit-fold' },
     ),
-    ...(['flop', 'turn', 'river'] as const).flatMap((street) => {
-      const activeThisStreet = activePlayers(hand, STREETS[STREETS.indexOf(street) - 1])
-      return withImplicitStreetEvents(activeThisStreet, hand.streets[street].actions, street, utgStraddled, false, true)
-        .filter(isNotImplicitCheck)
-        .map((ev): ShareEntry =>
-          ev.kind === 'action'
-            ? { street, playerId: ev.action.playerId, kind: 'action', action: ev.action }
+    ...(['flop', 'turn', 'river'] as const).flatMap((street): ShareEntry[] => {
+      const data = hand.streets[street]
+      // Postflop gaps in the records are written out explicitly: silence
+      // with no bet out reads as a check, silence facing a bet reads as the
+      // fold it was. Synthesis only makes sense when the street actually
+      // happened and at least two players still hold chips — an earlier
+      // all-in runout has nobody left able to check or fold.
+      const pool = activePlayers(hand, STREETS[STREETS.indexOf(street) - 1]).filter(
+        (p) => stackBeforeStreet(hand, street, p.id) > 0,
+      )
+      if ((data.board.length === 0 && data.actions.length === 0) || pool.length < 2) {
+        return data.actions.map((action): ShareEntry => ({ street, playerId: action.playerId, kind: 'action', action }))
+      }
+      return withImplicitStreetEvents(pool, data.actions, street, utgStraddled, false, true).map((ev): ShareEntry =>
+        ev.kind === 'action'
+          ? { street, playerId: ev.action.playerId, kind: 'action', action: ev.action }
+          : ev.kind === 'implicit-check'
+            ? {
+                street,
+                playerId: ev.playerId,
+                kind: 'action',
+                action: { id: `implicit-check-${street}-${ev.playerId}`, playerId: ev.playerId, type: 'check' },
+              }
             : { street, playerId: ev.playerId, kind: 'implicit-fold' },
-        )
+      )
     }),
   ]
   const maxUnits = maxPositionUnits(hand)

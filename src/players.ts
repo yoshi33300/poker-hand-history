@@ -134,6 +134,10 @@ export function withImplicitStreetEvents(
   let cursor = 0 // index in `ordered` of the next seat expected to act
   let betOut = startsWithBet
   let lastAggressorIdx = -1 // seat currently owed a response, if any
+  // Highest street total committed so far — an all-in (or sloppy "raise")
+  // that merely matches it is a call and must not reopen the action, or a
+  // caller behind would look like they owe a response they already gave.
+  let currentBet = 0
 
   for (const action of actions) {
     const idx = ordered.findIndex((p) => p.id === action.playerId)
@@ -163,8 +167,15 @@ export function withImplicitStreetEvents(
       if (action.type === 'fold') stillIn.delete(action.playerId)
       if (action.type === 'allin') allIn.add(action.playerId)
       if (action.type === 'bet' || action.type === 'raise' || action.type === 'allin') {
-        betOut = true
-        lastAggressorIdx = idx
+        // Amounts are street totals; only an actual increase is aggression.
+        // No recorded amount defaults to aggressive rather than silently
+        // treating a bet as a check.
+        const amount = action.amount ?? Number.POSITIVE_INFINITY
+        if (amount > currentBet) {
+          currentBet = amount
+          betOut = true
+          lastAggressorIdx = idx
+        }
       }
       covered.add(action.playerId)
       cursor = (idx + 1) % ordered.length
